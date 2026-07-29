@@ -26,27 +26,27 @@ const OPERATOR_COPY: Record<
 > = {
   "feature-noise": {
     question: "What if measurements become less precise?",
-    method: "Random noise is added to numeric evaluation inputs. The fitted model is not retrained.",
-    axis: "Added feature noise (robust σ)",
+    method: "Gaussian noise is added to each numeric evaluation input using its training-fold spread. The fitted model is held fixed.",
+    axis: "Added noise per feature",
     caveat: "This measures prediction robustness, not overfitting by itself.",
   },
   "label-noise": {
     question: "What if some training labels are wrong?",
-    method: "A share of training labels is corrupted and the model is fitted again for every repeat.",
+    method: "Binary labels flip at the chosen rate. Numeric targets receive scaled Gaussian noise. The model is refitted.",
     axis: "Training labels corrupted",
     caveat: "A steep fall suggests a fragile fitting process; it is not an overfitting verdict on its own.",
   },
   missingness: {
     question: "What if evaluation inputs arrive incomplete?",
-    method: "A share of evaluation cells is hidden. The fitted model is held fixed.",
-    axis: "Evaluation cells hidden",
+    method: "A share of evaluation cells is masked, then filled with the training-fold median. The fitted model is held fixed.",
+    axis: "Evaluation cells masked",
     caveat: "This measures tolerance to missing inputs, not overfitting by itself.",
   },
   "train-size": {
     question: "How dependent is the fit on having all training rows?",
-    method: "A share of training rows is removed and the model is fitted again for every repeat.",
+    method: "A share of training rows is removed. Preprocessing and the model are refitted on the remaining rows.",
     axis: "Training rows removed",
-    caveat: "A steep fall indicates data-volume sensitivity and should be read alongside the clean train–audit gap.",
+    caveat: "A steep fall indicates sensitivity to data volume. Read it alongside the clean gap between training and audit loss.",
   },
 };
 
@@ -323,7 +323,7 @@ export function StressChart({ curves }: StressChartProps) {
             transform={`rotate(-90 15 ${(VIEWBOX.top + VIEWBOX.height - VIEWBOX.bottom) / 2})`}
             aria-hidden="true"
           >
-            RETAINED PREDICTIVE SKILL
+            PERFORMANCE RETAINED
           </text>
         </svg>
       </div>
@@ -374,13 +374,13 @@ export function StressChart({ curves }: StressChartProps) {
               textAlign: "left",
             }}
           >
-            Exact values · {activeCurve.shortLabel}
+            Exact values for {activeCurve.shortLabel}
           </caption>
           <thead>
             <tr>
               <th scope="col">Severity</th>
               <th scope="col">Median retained</th>
-              <th scope="col">5th–95th percentile</th>
+              <th scope="col">5th to 95th percentile</th>
               <th scope="col">Compared with clean</th>
             </tr>
           </thead>
@@ -420,7 +420,7 @@ export function StressChart({ curves }: StressChartProps) {
       </div>
 
       <p className="chart-note">
-        Retained skill compares stressed loss with the clean model and a constant predictor: 100% means the clean predictive advantage is preserved; 0% means none remains. The shaded band is the empirical 5th–95th percentile across repeated paired splits—not generated extra data.
+        Performance retained compares stressed loss with clean loss. The scale is normalized by the clean model&apos;s advantage over a constant predictor, with a 1% floor when that advantage is very small. At 100%, stressed and clean loss match. Values below 0% or above 100% mean the loss changed by more than the normalization margin. The shaded band is the empirical 5th to 95th percentile across repeated paired splits. It is not generated extra data.
       </p>
     </div>
   );
@@ -506,7 +506,7 @@ function niceStep(value: number) {
 function formatSeverity(id: StressCurve["id"], level: number, compact = false) {
   if (id === "feature-noise") {
     const digits = approximately(level, 0) ? 0 : 2;
-    return `${level.toFixed(digits)}${compact ? "σ" : " robust σ"}`;
+    return `${level.toFixed(digits)}${compact ? "×" : " × typical training spread"}`;
   }
   return `${Math.round(level * 100)}%`;
 }
@@ -518,16 +518,16 @@ function formatRetained(value: number) {
 function comparisonLabel(value: number) {
   if (approximately(value, 1)) return "Clean reference";
   if (value > 1) return `${Math.round((value - 1) * 100)}% above clean`;
-  if (value >= 0) return `${Math.round((1 - value) * 100)}% of clean advantage lost`;
-  return "Worse than constant reference";
+  if (value >= 0) return `${Math.round((1 - value) * 100)}% of normalized margin lost`;
+  return "More than one normalization unit lost";
 }
 
 function plainReading(point: CurvePoint) {
-  if (point.level === 0) return "This is the clean, unstressed reference: 100% of predictive skill is retained.";
-  if (point.median >= 0.9) return `The typical run retained ${formatRetained(point.median)} of the clean model's predictive advantage—little degradation at this severity.`;
-  if (point.median >= 0.5) return `The typical run retained ${formatRetained(point.median)} of the clean model's predictive advantage—a noticeable loss, but more than half remains.`;
-  if (point.median >= 0) return `The typical run retained only ${formatRetained(point.median)} of the clean model's predictive advantage—a material failure boundary.`;
-  return "The typical stressed run fell below the constant-predictor reference at this severity.";
+  if (point.level === 0) return "This is the clean, unstressed reference: performance retained is fixed at 100%.";
+  if (point.median >= 0.9) return `The typical run retained ${formatRetained(point.median)} of the normalized clean margin. Degradation is small at this severity.`;
+  if (point.median >= 0.5) return `The typical run retained ${formatRetained(point.median)} of the normalized clean margin. The loss is noticeable, but more than half remains.`;
+  if (point.median >= 0) return `The typical run retained only ${formatRetained(point.median)} of the normalized clean margin. This is a material failure boundary.`;
+  return "The typical stressed run lost more than the full normalization margin at this severity.";
 }
 
 function approximately(left: number, right: number) {

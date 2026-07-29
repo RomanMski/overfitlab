@@ -4,6 +4,8 @@
 
 StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train–audit gap, traces response curves under declared perturbations, and compares the complete fitting procedure with a label-permutation null.
 
+The name compresses the protocol: controlled **stress** tests repeated across train and audit splits.
+
 It is an experimental instrument, not an overfitting detector and not a synthetic-data generator. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
 
 > Status: `0.1.0` is an alpha research release for binary classification and regression on tabular data.

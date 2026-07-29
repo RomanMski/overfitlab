@@ -17,6 +17,7 @@ import {
 import { downloadText, parseCsv, tableToCsv } from "../lib/csv";
 import { buildHtmlReport } from "../lib/report";
 import { ConceptExplainers } from "./ConceptExplainers";
+import { FormulaGuide } from "./FormulaGuide";
 import { StressChart } from "./StressChart";
 
 const SAMPLE_TABLE = makeSampleDataset();
@@ -235,76 +236,68 @@ export function StressFoldApp() {
           <span>StressFold</span>
         </a>
         <nav className="primary-nav" aria-label="Primary navigation">
-          <a href="#learn">Learn the tests</a>
-          <a href="#lab">Try the demo</a>
+          <a href="#lab">Use the lab</a>
+          <a href="#python">Use your model</a>
+          <a href="#math">Mathematics</a>
           <a href="#paper">Paper</a>
         </nav>
-        <div className="header-status"><span /> v0.2 research preview</div>
+        <div className="header-status"><span /> v0.1.0 alpha</div>
       </header>
 
       <main id="top">
         <section className="hero section-boundary">
           <div className="hero-copy">
-            <div className="kicker"><span>Overfitting stress tests</span><span>Tabular models</span></div>
-            <h1>Does your model still work when the data gets slightly worse?</h1>
+            <div className="kicker"><span>Generalization stress tests</span><span>Tabular models</span></div>
+            <h1>Test a model beyond its training data.</h1>
             <p className="hero-lede">
-              Give a model an unseen-data exam, damage the data in controlled ways, and repeat the experiment so one lucky split cannot decide the result.
+              StressFold measures the gap between training and unseen data. It then checks what happens under measurement noise, missing values, wrong labels, and smaller training sets.
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="#lab">Run the worked example <span aria-hidden="true">→</span></a>
-              <a className="button button-quiet" href="#learn">Learn the five tests</a>
+              <a className="button button-primary" href="#lab">Open the browser lab <span aria-hidden="true">→</span></a>
+              <a className="button button-quiet" href="#python">Use the Python package</a>
             </div>
             <div className="trust-row" aria-label="Product properties">
-              <span>Runs locally</span>
-              <span>Every run is repeatable</span>
-              <span>No black-box verdict</span>
+              <span>Use a CSV in the browser</span>
+              <span>Bring your model in Python</span>
+              <span>Repeatable results</span>
             </div>
           </div>
           <div className="protocol-figure" aria-label="A four-step model stress test">
-            <div className="figure-label">A fair model exam</div>
+            <div className="figure-label">StressFold protocol</div>
             <div className="protocol-nodes">
-              <div className="protocol-node active"><b>01</b><span>Hide rows</span><small>Save an unseen exam</small></div>
+              <div className="protocol-node active"><b>01</b><span>Split</span><small>Make a train and audit split</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
               <div className="protocol-node"><b>02</b><span>Fit</span><small>Use training rows only</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
-              <div className="protocol-node"><b>03</b><span>Stress</span><small>Add controlled damage</small></div>
+              <div className="protocol-node"><b>03</b><span>Stress</span><small>Apply one perturbation</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
-              <div className="protocol-node"><b>04</b><span>Repeat</span><small>Change the split</small></div>
+              <div className="protocol-node"><b>04</b><span>Repeat</span><small>Use many new folds</small></div>
             </div>
             <div className="figure-output">
-              <div><span>The useful answer</span><strong>Where does performance fail?</strong></div>
+              <div><span>The output</span><strong>A profile of where performance fails</strong></div>
               <div className="mini-bars" aria-hidden="true">
                 <i style={{ height: "86%" }} /><i style={{ height: "74%" }} /><i style={{ height: "48%" }} /><i style={{ height: "25%" }} />
               </div>
             </div>
-            <p>StressFold reports evidence about this test—not a magical “overfit / not overfit” stamp.</p>
+            <p>Repeated train and audit splits under controlled stress. This is what the name refers to.</p>
           </div>
         </section>
-
-        <section className="definition-strip" aria-label="The four questions in a StressFold audit">
-          <div><b>01</b><span>New rows</span><small>Does practice transfer?</small></div>
-          <div><b>02</b><span>Damaged inputs</span><small>What breaks first?</small></div>
-          <div><b>03</b><span>Repeated splits</span><small>Was one result lucky?</small></div>
-          <div><b>04</b><span>Shuffled answers</span><small>Does nonsense still score?</small></div>
-        </section>
-
-        <ConceptExplainers />
 
         <section className="lab-section" id="lab">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">A complete worked example</div>
-              <h2>Try the test, then inspect every number.</h2>
+              <div className="eyebrow">Interactive browser lab</div>
+              <h2>Run a generalization and robustness audit.</h2>
             </div>
             <p>
-              The browser fits a clearly labelled demo model to a CSV. To audit your exact production pipeline, use the Python API with your own scikit-learn compatible model.
+              The browser demonstrates the protocol with a transparent baseline model. The Python package applies the same tests to your own scikit-learn compatible pipeline.
             </p>
           </div>
 
           <div className="lab-workspace">
             <aside className="control-panel" id="audit-controls" aria-label="Test setup">
               <div className="panel-heading">
-                <div><span>Three choices</span><strong>Set up the demo</strong></div>
+                <div><span>Dataset and model</span><strong>Set up a test</strong></div>
                 <span className="step-counter">Local only</span>
               </div>
 
@@ -314,7 +307,7 @@ export function StressFoldApp() {
                   <div className="file-glyph" aria-hidden="true"><span>CSV</span></div>
                   <div className="dataset-meta">
                     <strong title={table.name}>{table.name}</strong>
-                    <span>{table.rows.length.toLocaleString()} rows · {table.headers.length} columns</span>
+                    <span>{table.rows.length.toLocaleString()} rows, {table.headers.length} columns</span>
                   </div>
                   <button className="icon-button" type="button" onClick={() => fileInputRef.current?.click()} aria-label="Choose another CSV">↗</button>
                   <input
@@ -330,7 +323,7 @@ export function StressFoldApp() {
                   />
                 </div>
                 <div className="dataset-actions">
-                  <button type="button" onClick={() => fileInputRef.current?.click()}>Use my CSV</button>
+                    <button type="button" onClick={() => fileInputRef.current?.click()}>Test a baseline on my CSV</button>
                   <button type="button" onClick={restoreSample}>Restore example</button>
                 </div>
 
@@ -341,7 +334,7 @@ export function StressFoldApp() {
                       <thead><tr>{previewHeaders.map((header) => <th key={header}>{header}</th>)}</tr></thead>
                       <tbody>
                         {table.rows.slice(0, 5).map((row, index) => (
-                          <tr key={index}>{previewHeaders.map((header) => <td key={header}>{String(row[header] ?? "—")}</td>)}</tr>
+                          <tr key={index}>{previewHeaders.map((header) => <td key={header}>{String(row[header] ?? "missing")}</td>)}</tr>
                         ))}
                       </tbody>
                     </table>
@@ -349,7 +342,7 @@ export function StressFoldApp() {
                 </details>
 
                 <div className="control-group">
-                  <label htmlFor="target-column">What should the demo predict?</label>
+                  <label htmlFor="target-column">What should the model predict?</label>
                   <select
                     id="target-column"
                     value={target}
@@ -361,7 +354,7 @@ export function StressFoldApp() {
                   >
                     {targetOptions.map((option) => (
                       <option key={option.header} value={option.header} disabled={!option.valid}>
-                        {option.header} — {option.description}
+                        {option.header} ({option.description})
                       </option>
                     ))}
                   </select>
@@ -371,17 +364,17 @@ export function StressFoldApp() {
                 </div>
 
                 <div className="control-group">
-                  <label htmlFor="model-kind">Which demo model?</label>
+                  <label htmlFor="model-kind">Which baseline model?</label>
                   <select id="model-kind" value={model} onChange={(event) => setModel(event.target.value as ModelKind)}>
-                    <option value="regularized">Steady baseline · regularized linear model</option>
-                    <option value="nearest-neighbor">Flexible baseline · nearest neighbors</option>
+                    <option value="regularized">Steady baseline (regularized linear model)</option>
+                    <option value="nearest-neighbor">Flexible baseline (nearest neighbors)</option>
                   </select>
                   <small>This choice tests a built-in baseline, not a model already running elsewhere.</small>
                 </div>
 
                 <div className="preset-row" aria-label="Repeat preset">
-                  <button type="button" onClick={() => applyPreset("quick")}>Quick · 8 repeats</button>
-                  <button type="button" onClick={() => applyPreset("careful")}>Careful · 24 repeats</button>
+                  <button type="button" onClick={() => applyPreset("quick")}>Quick, 8 repeats</button>
+                  <button type="button" onClick={() => applyPreset("careful")}>Careful, 24 repeats</button>
                 </div>
 
                 <details className="advanced-controls">
@@ -411,7 +404,7 @@ export function StressFoldApp() {
                 disabled={running}
                 onClick={() => void executeAudit(table, settings, currentRunKey)}
               >
-                <span>{running ? "Repeating the unseen-data exam" : changesNotApplied ? "Run updated test" : result ? "Run this test again" : "Build the worked example"}</span>
+                <span>{running ? "Running repeated audit splits" : changesNotApplied ? "Run updated test" : result ? "Run this test again" : "Run the sample audit"}</span>
                 <b aria-hidden="true">{running ? `${Math.round(progress * 100)}%` : "→"}</b>
               </button>
               {running && <div className="progress-block" role="status"><i style={{ width: `${progress * 100}%` }} /><span>{progressLabel}</span></div>}
@@ -429,8 +422,8 @@ export function StressFoldApp() {
 
               <div className="result-toolbar">
                 <div>
-                  <span className="result-state"><i className={result ? "ready" : ""} /> {result ? "Worked result" : running ? "Building the example" : "Example queued"}</span>
-                  <strong>{result ? `${result.dataset.rows.toLocaleString()} usable rows · predicting ${result.dataset.target}` : "Preparing a complete churn-model audit"}</strong>
+                  <span className="result-state"><i className={result ? "ready" : ""} /> {result ? "Audit result" : running ? "Running the audit" : "Audit queued"}</span>
+                  <strong>{result ? `${result.dataset.rows.toLocaleString()} usable rows, predicting ${result.dataset.target}` : "Preparing the sample churn audit"}</strong>
                 </div>
                 <div className="hash-label">RUN / {resultHash.toUpperCase()}</div>
               </div>
@@ -438,16 +431,16 @@ export function StressFoldApp() {
               {result ? (
                 <>
                   <div className="result-answer">
-                    <span>Plain-English read</span>
+                    <span>Result summary</span>
                     <h3>{headline}</h3>
                     <p>
-                      The model was fitted without seeing the exam rows. Every stress below changes one thing at a time, then compares the result with the same clean split.
+                      The model was fitted without seeing the audit rows. Every stress below changes one thing at a time, then compares the result with the same clean split.
                     </p>
                   </div>
 
                   <div className="run-context" aria-label="Settings used for the visible result">
                     <span>Target <strong>{result.dataset.target}</strong></span>
-                    <span>Demo model <strong>{modelName(result.protocol.model)}</strong></span>
+                    <span>Browser model <strong>{modelName(result.protocol.model)}</strong></span>
                     <span>Repeats <strong>{result.protocol.repeats}</strong></span>
                     <span>Unseen rows <strong>{Math.round(result.protocol.testSize * 100)}%</strong></span>
                     <span>Seed <strong>{result.protocol.seed}</strong></span>
@@ -462,24 +455,24 @@ export function StressFoldApp() {
                     <Metric
                       label="Extra error on unseen rows"
                       value={formatMetric(result.baseline.gap)}
-                      note={`${result.baseline.lossLabel}: unseen loss minus training loss`}
+                      note={`${result.baseline.lossLabel}: median of paired unseen minus training gaps`}
                     />
                     <Metric
                       label="Dependence on the split"
                       value={formatMetric(result.baseline.splitSpread)}
-                      note="middle 90% spread; smaller is steadier"
+                      note="5th to 95th percentile spread; smaller is steadier"
                     />
                     <Metric
-                      label="Real labels versus shuffled"
-                      value={`${Math.round(result.permutation.percentile)} / 100`}
-                      note="higher means the real relationship wins"
+                      label="Real score versus shuffled median"
+                      value={`${formatMetric(result.permutation.observed)} vs ${formatMetric(result.permutation.nullMedian)}`}
+                      note={`${result.baseline.scoreLabel}; ${result.permutation.runs} shuffled refits; corrected rank ${Math.round(result.permutation.percentile)} / 100`}
                     />
                   </div>
 
                   <div className="result-section chart-section">
                     <div className="result-section-heading">
-                      <div><span>Controlled damage</span><h3>How each stress changes predictive skill</h3></div>
-                      <div className="method-chip">median + middle 90% of repeats</div>
+                      <div><span>Stress response</span><h3>Performance retained under each stress</h3></div>
+                      <div className="method-chip">median, 5th to 95th percentile</div>
                     </div>
                     <StressChart curves={result.curves} />
                   </div>
@@ -499,7 +492,7 @@ export function StressFoldApp() {
                     <p>These summaries are useful for comparing runs. They are not combined into one made-up “robustness score.”</p>
                     <div className="summary-table-wrap">
                       <table className="summary-table">
-                        <thead><tr><th>Stress test</th><th>What changes</th><th>Average curve loss</th><th>First-step loss</th><th>Half-skill point</th></tr></thead>
+                        <thead><tr><th>Stress test</th><th>What changes</th><th>Normalized curve area</th><th>First tested step loss</th><th>First tested level at or below 50%</th></tr></thead>
                         <tbody>
                           {result.summaries.map((summary) => (
                             <tr key={summary.id}>
@@ -514,15 +507,15 @@ export function StressFoldApp() {
 
                   <div className="export-panel">
                     <div className="export-heading">
-                      <div><span>Repeatable test cases</span><h3>Generate a damaged copy of the data</h3></div>
-                      <p>Use the exported CSV to challenge your own model. It is a test case—not extra training data and not new real-world evidence.</p>
+                      <div><span>Export a stress case</span><h3>Create a perturbed CSV</h3></div>
+                      <p>Use the exported CSV to challenge your own model. It is a test case. It is not extra training data or new real world evidence.</p>
                     </div>
                     <div className="export-controls">
                       <select aria-label="Damage type" value={variantFamily} onChange={(event) => handleFamilyChange(event.target.value as VariantFamily)}>
-                        <option value="feature-noise">Wobble numeric measurements</option>
-                        <option value="label-noise">Corrupt some training answers</option>
-                        <option value="missingness">Remove some input cells</option>
-                        <option value="bootstrap">Resample existing rows</option>
+                        <option value="feature-noise">Add Gaussian feature noise</option>
+                        <option value="label-noise">Corrupt training targets</option>
+                        <option value="missingness">Mask input cells</option>
+                        <option value="bootstrap">Resample rows with replacement</option>
                       </select>
                       <select aria-label="Damage severity" value={variantLevel} disabled={variantFamily === "bootstrap"} onChange={(event) => setVariantLevel(Number(event.target.value))}>
                         {VARIANT_LEVELS[variantFamily].map((level) => <option key={level} value={level}>{variantFamily === "bootstrap" ? "row resample" : `${Math.round(level * 100)}% severity`}</option>)}
@@ -531,49 +524,45 @@ export function StressFoldApp() {
                       <button type="button" onClick={() => downloadVariant("manifest")}>Download recipe</button>
                     </div>
                     <div className="report-actions">
-                      <button type="button" onClick={() => downloadText(buildHtmlReport(result), `stressfold_${resultHash}.html`, "text/html;charset=utf-8")}>Self-contained report</button>
-                      <button type="button" onClick={() => downloadText(JSON.stringify(result, null, 2), `stressfold_${resultHash}.json`, "application/json;charset=utf-8")}>Raw result data</button>
+                      <button type="button" onClick={() => downloadText(buildHtmlReport(result), `stressfold_${resultHash}.html`, "text/html;charset=utf-8")}>Download report</button>
+                      <button type="button" onClick={() => downloadText(JSON.stringify(result, null, 2), `stressfold_${resultHash}.json`, "application/json;charset=utf-8")}>Download result JSON</button>
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="empty-result">
                   <div className="empty-orbit" aria-hidden="true"><i /><i /><i /></div>
-                  <h3>{error ? "This setup needs one fix" : "Building the worked example"}</h3>
-                  <p>{error ?? "StressFold is fitting the demo model, reserving unseen rows, applying four controlled stresses, and repeating the split."}</p>
+                  <h3>{error ? "This setup needs one fix" : "Running the sample audit"}</h3>
+                  <p>{error ?? "StressFold is fitting the baseline model, reserving unseen rows, applying four controlled stresses, and repeating the split."}</p>
                 </div>
               )}
             </section>
           </div>
         </section>
 
-        <section className="method-section section-boundary" id="method">
+        <section className="method-section section-boundary" id="python">
           <div className="section-heading compact-heading">
-            <div><div className="eyebrow">Interpretation boundary</div><h2>A stress profile is evidence, not a certificate.</h2></div>
-            <p>A model can be sensitive without being overfit, and a clean holdout result can still fail after time drift, leakage, or a population change.</p>
+            <div><div className="eyebrow">Python library</div><h2>Run the same audit on your actual pipeline.</h2></div>
+            <p>The browser uses transparent baselines so every step is easy to inspect. The Python package accepts the estimator and preprocessing you actually use.</p>
           </div>
           <div className="scope-grid">
             <div className="scope-card">
-              <div className="eyebrow">What the browser does</div>
-              <h3>It audits a transparent baseline on your CSV.</h3>
-              <p>That makes the method easy to inspect and the generated stress datasets easy to reuse. It does not silently pretend to be your deployed model.</p>
+              <div className="eyebrow">Browser lab</div>
+              <h3>Inspect the method on a built-in baseline.</h3>
+              <p>Upload a CSV, choose a target, and explore every split, stress curve, and shuffled-label comparison locally. This is a protocol demonstration, not a silent claim about a deployed model.</p>
             </div>
             <div className="scope-card dark">
-              <div className="eyebrow">What the Python package adds</div>
-              <h3>Bring the model and preprocessing you actually use.</h3>
-              <p>The same stress protocol can wrap a scikit-learn compatible pipeline so fitting, preprocessing, and refitting happen inside each training split.</p>
+              <div className="eyebrow">Python package</div>
+              <h3>Audit the model and preprocessing you actually use.</h3>
+              <p>Pass a scikit-learn compatible pipeline to StressFold. Preprocessing, fitting, and every refit stay inside the appropriate training fold.</p>
               <ul><li>binary classification</li><li>regression</li><li>custom pipelines</li></ul>
             </div>
           </div>
-          <details className="math-notes">
-            <summary>Show the equations with a worked example</summary>
-            <div className="math-notes__grid">
-              <article><span>Generalization gap</span><code>unseen loss − training loss</code><p>If unseen loss is 0.22 and training loss is 0.08, the gap is 0.14 extra error on new rows.</p></article>
-              <article><span>Retained skill</span><code>(reference loss − stressed loss) ÷ (reference loss − clean loss)</code><p>100% means the stress changed nothing; 50% means half the useful advantage remains; 0% means no advantage over the simple reference.</p></article>
-              <article><span>Monte Carlo summary</span><code>repeat → sort → median + middle 90%</code><p>Here “Monte Carlo” only means repeating controlled random splits. The band shows run-to-run variation, not a universal confidence guarantee.</p></article>
-            </div>
-          </details>
         </section>
+
+        <FormulaGuide />
+
+        <ConceptExplainers />
 
         <section className="paper-section" id="paper">
           <div className="paper-index">SF / 02</div>
@@ -596,7 +585,7 @@ export function StressFoldApp() {
       <footer className="site-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>StressFold</span></div>
         <p>Controlled model stress tests, with the limits left visible.</p>
-        <div><a href="#learn">Learn</a><a href="#paper">Paper</a><a href="#top">Back to top</a></div>
+        <div><a href="#lab">Lab</a><a href="#python">Python</a><a href="#math">Mathematics</a><a href="#learn">Visual notes</a><a href="#paper">Paper</a><a href="#top">Back to top</a></div>
       </footer>
     </div>
   );
@@ -607,7 +596,7 @@ function Metric({ label, value, note }: { label: string; value: string; note: st
 }
 
 function formatMetric(value: number) {
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "not available";
   return value.toFixed(Math.abs(value) < 0.1 ? 3 : 2);
 }
 
@@ -616,26 +605,22 @@ function modelName(model: ModelKind) {
 }
 
 function buildResultHeadline(result: AuditResult, weakestLabel: string) {
-  const score = result.baseline.score;
-  const signal = result.baseline.scoreLabel === "AUROC"
-    ? score >= 0.75 ? "useful signal" : score >= 0.6 ? "some signal" : "weak signal"
-    : score >= 0.5 ? "useful signal" : score > 0 ? "some signal" : "weak signal";
-  return `The demo finds ${signal}; ${weakestLabel.toLowerCase()} is its weakest stress path.`;
+  return `${result.baseline.scoreLabel} on unseen rows is ${formatMetric(result.baseline.score)}. Across the four tested grids, ${weakestLabel.toLowerCase()} causes the largest overall decline.`;
 }
 
 function plainFindingLabel(kind: AuditFinding["kind"]) {
-  if (kind === "generalization") return "Practice versus exam";
-  if (kind === "robustness") return "Weakest stress";
-  return "Real signal versus nonsense";
+  if (kind === "generalization") return "Training versus unseen loss";
+  if (kind === "robustness") return "Largest curve decline";
+  return "Real labels versus shuffled labels";
 }
 
 function plainFindingDetail(finding: AuditFinding, result: AuditResult) {
   if (finding.kind === "generalization") {
-    return `Training loss was ${formatMetric(result.baseline.trainLoss)} and unseen-row loss was ${formatMetric(result.baseline.auditLoss)}. Their difference is ${formatMetric(result.baseline.gap)}; a large positive difference is an overfitting warning.`;
+    return `Within each repeat, unseen loss minus training loss was computed. The median paired gap was ${formatMetric(result.baseline.gap)}. For context, the separate medians were ${formatMetric(result.baseline.trainLoss)} for training and ${formatMetric(result.baseline.auditLoss)} for unseen rows.`;
   }
   if (finding.kind === "robustness") {
     const weakest = [...result.summaries].sort((left, right) => right.degradationArea - left.degradationArea)[0];
-    return `${weakest.label} removed the most skill across the tested levels. Open the curve above to see the first severity where the decline appears.`;
+    return `${weakest.label} has the largest normalized trapezoid area on its tested grid. Open the curve above to inspect the actual severities. This does not claim that unlike stress levels are equally realistic.`;
   }
-  return `The real target beat about ${Math.round(result.permutation.percentile)}% of the shuffled-label refits. Shuffling deliberately destroys the relationship the model is supposed to learn.`;
+  return `The real score has a corrected null rank of ${Math.round(result.permutation.percentile)} on a 0 to 100 scale. The plus one correction means this is not literally the percentage of shuffled runs beaten and it is not a p-value.`;
 }

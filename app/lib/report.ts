@@ -58,7 +58,7 @@ export function buildHtmlReport(result: AuditResult): string {
   <h2>Stress-response summaries</h2>
   <table><thead><tr><th>Operator</th><th>Experiment</th><th>Degradation area</th><th>First-step loss</th><th>50% skill boundary</th></tr></thead><tbody>${rows}</tbody></table>
   ${warnings}
-  <footer>Source ${escapeHtml(result.protocol.sourceHash)} · Generated ${escapeHtml(result.protocol.generatedAt)} · ${escapeHtml(result.protocol.browserEngine)}. Monte Carlo intervals describe run-to-run variability under this protocol; they are not classical confidence intervals.</footer>
+  <footer>Source ${escapeHtml(result.protocol.sourceHash)}. Generated ${escapeHtml(result.protocol.generatedAt)} with ${escapeHtml(result.protocol.browserEngine)}. Monte Carlo intervals describe variation between runs under this protocol; they are not classical confidence intervals.</footer>
 </main></body></html>`;
 }
 

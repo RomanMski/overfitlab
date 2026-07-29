@@ -613,7 +613,7 @@
   box-shadow: 0 0 0 1px var(--amber);
 }
 
-.sf-learn-monte-carlo__mean {
+.sf-learn-monte-carlo__median {
   position: absolute;
   z-index: 1;
   top: 5px;
@@ -624,14 +624,14 @@
   transition: left 160ms ease;
 }
 
-.sf-learn-monte-carlo__mean::before {
+.sf-learn-monte-carlo__median::before {
   position: absolute;
   top: 4px;
   left: 6px;
   padding: 2px 5px;
   background: var(--teal-open);
   color: var(--teal-dark);
-  content: "mean";
+  content: "median";
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;
   font-weight: 700;

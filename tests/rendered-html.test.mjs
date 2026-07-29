@@ -15,19 +15,36 @@ async function render() {
   );
 }
 
-test("server-renders the StressFold research instrument", async () => {
+test("server-renders the StressFold tool before its method reference", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>StressFold - Generalization stress tests for tabular models<\/title>/i);
-  assert.match(html, /Does your model still work when the data gets slightly worse/);
-  assert.match(html, /Build the worked example/);
-  assert.match(html, /A stress profile is evidence, not a certificate/);
-  assert.match(html, /Five ideas, no statistical shorthand required/);
-  assert.match(html, /one roll of the dice/i);
-  assert.match(html, /What it cannot prove/);
+  assert.match(html, /<title>StressFold \| Generalization stress tests for tabular models<\/title>/i);
+  assert.match(html, /Test a model beyond its training data/);
+  assert.match(html, /Run the sample audit/);
+  assert.match(html, /Run the same audit on your actual pipeline/);
+  assert.match(html, /Read the audit equations term by term/);
+  assert.match(html, /id="math"/);
+  assert.match(html, /Stress operators and curve summaries/);
+  assert.match(html, /Normalized trapezoid area/);
+  assert.match(html, /Browser losses/);
+  assert.match(html, /Browser scores/);
+  assert.match(html, /Training loss versus unseen loss/);
+  assert.match(html, /Test a baseline on my CSV/);
+  assert.match(html, />Limit</);
+  assert.ok(
+    html.indexOf("Run a generalization and robustness audit") <
+      html.indexOf("Read the audit equations term by term"),
+    "the working lab should appear before the mathematics reference",
+  );
+  assert.ok(
+    html.indexOf("Run the same audit on your actual pipeline") <
+      html.indexOf("Explore how each test behaves"),
+    "the Python tool should be explained before the interactive lessons",
+  );
+  assert.doesNotMatch(html, /—/);
   assert.doesNotMatch(html, /No audit result yet/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -40,7 +57,7 @@ test("removes all temporary starter-preview infrastructure", async () => {
   ]);
 
   assert.match(page, /StressFoldApp/);
-  assert.match(layout, /StressFold - Generalization stress tests/);
+  assert.match(layout, /StressFold \| Generalization stress tests/);
   assert.doesNotMatch(page, /codex-preview|SkeletonPreview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));

@@ -229,7 +229,6 @@ export async function runAudit(
     const trainMetric = evaluate(settings.task, trainY, cleanTrainPrediction);
     const testMetric = evaluate(settings.task, testY, cleanTestPrediction);
     const referenceLoss = constantReferenceLoss(settings.task, trainY, testY);
-    const advantage = referenceLoss - testMetric.loss;
 
     trainLosses.push(trainMetric.loss);
     auditLosses.push(testMetric.loss);
@@ -243,14 +242,17 @@ export async function runAudit(
       const stressRng = mulberry32(mixSeed(repeatSeed, 1000 + Math.round(level * 1000)));
       const perturbed = addFeatureNoise(testX, stats.robustScales, level, stressRng);
       const stressedLoss = evaluate(settings.task, testY, model.predict(perturbed)).loss;
-      curveSamples.get("feature-noise")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss, advantage));
+      curveSamples.get("feature-noise")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss));
     }
 
     for (const level of MISSING_LEVELS.slice(1)) {
       const stressRng = mulberry32(mixSeed(repeatSeed, 2000 + Math.round(level * 1000)));
-      const perturbed = injectMissingness(testX, level, stressRng);
+      const transformedMedians = stats.medians.map(
+        (value, column) => (value - stats.means[column]) / stats.scales[column],
+      );
+      const perturbed = injectMissingness(testX, transformedMedians, level, stressRng);
       const stressedLoss = evaluate(settings.task, testY, model.predict(perturbed)).loss;
-      curveSamples.get("missingness")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss, advantage));
+      curveSamples.get("missingness")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss));
     }
 
     for (const level of LABEL_LEVELS.slice(1)) {
@@ -258,18 +260,21 @@ export async function runAudit(
       const stressedY = corruptLabels(trainY, settings.task, level, stressRng);
       const stressedModel = fitModel(settings.model, settings.task, trainX, stressedY, stressRng);
       const stressedLoss = evaluate(settings.task, testY, stressedModel.predict(testX)).loss;
-      curveSamples.get("label-noise")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss, advantage));
+      curveSamples.get("label-noise")?.get(level)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss));
     }
 
     for (const severity of SIZE_STRESS_LEVELS.slice(1)) {
       const fraction = 1 - severity;
       const stressRng = mulberry32(mixSeed(repeatSeed, 4000 + Math.round(severity * 1000)));
       const subset = subsampleIndices(trainY, settings.task, fraction, stressRng);
-      const subsetX = subset.map((index) => trainX[index]);
+      const rawSubsetIndices = subset.map((index) => split.train[index]);
+      const subsetStats = fitScale(prepared.X, rawSubsetIndices);
+      const subsetX = rawSubsetIndices.map((index) => transformRow(prepared.X[index], subsetStats));
       const subsetY = subset.map((index) => trainY[index]);
+      const subsetTestX = split.test.map((index) => transformRow(prepared.X[index], subsetStats));
       const stressedModel = fitModel(settings.model, settings.task, subsetX, subsetY, stressRng);
-      const stressedLoss = evaluate(settings.task, testY, stressedModel.predict(testX)).loss;
-      curveSamples.get("train-size")?.get(severity)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss, advantage));
+      const stressedLoss = evaluate(settings.task, testY, stressedModel.predict(subsetTestX)).loss;
+      curveSamples.get("train-size")?.get(severity)?.push(retainedSkill(referenceLoss, testMetric.loss, stressedLoss));
     }
 
     const permutationRng = mulberry32(mixSeed(repeatSeed, 9001));
@@ -330,7 +335,7 @@ export async function runAudit(
       model: settings.model,
       sourceHash: fingerprint(table),
       generatedAt: new Date().toISOString(),
-      browserEngine: "StressFold browser protocol 0.1",
+      browserEngine: "StressFold browser protocol 0.2",
     },
   };
 }
@@ -555,17 +560,19 @@ function constantReferenceLoss(task: TaskType, trainY: number[], testY: number[]
   return mean(testY.map((value) => (value - constant) ** 2));
 }
 
-function retainedSkill(reference: number, clean: number, stressed: number, advantage: number) {
-  if (advantage > Math.max(1e-8, reference * 0.01)) return (reference - stressed) / advantage;
-  return 1 - (stressed - clean) / Math.max(reference, clean, 1e-6);
+function retainedSkill(reference: number, clean: number, stressed: number) {
+  const normalization = Math.max(reference - clean, reference * 0.01, 1e-8);
+  return 1 - (stressed - clean) / normalization;
 }
 
 function addFeatureNoise(X: number[][], scales: number[], level: number, rng: () => number) {
   return X.map((row) => row.map((value, column) => value + gaussian(rng) * scales[column] * level));
 }
 
-function injectMissingness(X: number[][], level: number, rng: () => number) {
-  return X.map((row) => row.map((value) => (rng() < level ? 0 : value)));
+function injectMissingness(X: number[][], fillValues: number[], level: number, rng: () => number) {
+  return X.map((row) =>
+    row.map((value, column) => (rng() < level ? fillValues[column] : value)),
+  );
 }
 
 function corruptLabels(y: number[], task: TaskType, level: number, rng: () => number) {
@@ -591,7 +598,7 @@ function buildCurves(samples: Map<string, Map<number, number[]>>): StressCurve[]
     "feature-noise": {
       label: "Numeric measurement noise",
       shortLabel: "Feature noise",
-      unit: "robust σ",
+      unit: "× typical training spread",
       stroke: "#1f5c63",
       dash: [],
     },
@@ -685,21 +692,21 @@ function buildFindings(
       kind: "generalization",
       eyebrow: "Generalization",
       title: gapStatus === "stable" ? "Clean split gap is contained" : "Clean split gap needs attention",
-      detail: `Median audit loss exceeds training loss by ${formatNumber(baseline.gap, 3)} across paired splits (${formatPercent(Math.max(0, gapRatio))} of audit loss). This is descriptive evidence, not a proof of overfitting.`,
+      detail: `The median paired audit loss minus training loss gap is ${formatNumber(baseline.gap, 3)}. Its positive part is ${formatPercent(Math.max(0, gapRatio))} of audit loss. This is descriptive evidence, not a proof of overfitting.`,
       status: gapStatus,
     },
     {
       kind: "robustness",
       eyebrow: "Robustness",
-      title: `${weakest.label} is the sharpest failure path`,
-      detail: `Its degradation area is ${formatNumber(weakest.degradationArea, 2)}. Compare the complete response curve before choosing a deployment tolerance; unrelated stressors are deliberately not collapsed into one score.`,
+      title: `${weakest.label} has the largest curve decline`,
+      detail: `Its normalized curve area is ${formatNumber(weakest.degradationArea, 2)} on the tested grid. This comparison organizes the four plots; it does not claim that unlike stress levels have equal real-world severity.`,
       status: robustnessStatus,
     },
     {
       kind: "falsification",
       eyebrow: "Falsification",
       title: nullStatus === "stable" ? "Observed signal clears the quick null" : "Null separation is inconclusive",
-      detail: `The observed ${baseline.scoreLabel} sits at the ${formatNumber(percentile, 0)}th percentile of ${task === "classification" ? "label-permuted" : "target-permuted"} refits; null median ${formatNumber(nullMedian, 3)}. Increase permutations before publication or decision use.`,
+      detail: `The observed ${baseline.scoreLabel} has a corrected null rank of ${formatNumber(percentile, 0)} on a 0 to 100 scale against ${task === "classification" ? "label-permuted" : "target-permuted"} refits; null median ${formatNumber(nullMedian, 3)}. This is a quick rank, not a permutation p-value. Increase permutations before publication or decision use.`,
       status: nullStatus,
     },
   ];
@@ -845,7 +852,7 @@ function formatLevel(value: number) {
 }
 
 function formatNumber(value: number, digits: number) {
-  return Number.isFinite(value) ? value.toFixed(digits) : "—";
+  return Number.isFinite(value) ? value.toFixed(digits) : "not available";
 }
 
 function formatPercent(value: number) {

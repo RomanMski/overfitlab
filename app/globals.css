@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./concepts.css";
+@import "./formulas.css";
 
 :root {
   --paper: #f3f0e7;

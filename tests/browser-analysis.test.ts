@@ -49,6 +49,14 @@ test("sample audit is deterministic and returns all evidence families", async ()
   assert.equal(first.baseline.score, second.baseline.score);
   assert.deepEqual(first.curves, second.curves);
   assert.equal(first.curves.length, 4);
+  assert.equal(first.protocol.browserEngine, "StressFold browser protocol 0.2");
+  for (const curve of first.curves) {
+    assert.equal(curve.points[0].level, 0);
+    assert.equal(curve.points[0].median, 1);
+    assert.ok(curve.points.every((point) =>
+      [point.median, point.low, point.high].every(Number.isFinite)
+    ));
+  }
   assert.deepEqual(first.findings.map((finding) => finding.kind), [
     "generalization",
     "robustness",

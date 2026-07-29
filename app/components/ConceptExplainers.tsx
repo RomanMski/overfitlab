@@ -69,21 +69,21 @@ function ConceptFrame({
       <div className="sf-learn-card__visual">{children}</div>
 
       <div className="sf-learn-formula">
-        <span className="sf-learn-formula__label">Math in one line</span>
+        <span className="sf-learn-formula__label">Quick formula</span>
         <code>{formula}</code>
       </div>
 
       <dl className="sf-learn-interpretation">
         <div className="sf-learn-interpretation__item">
-          <dt>What it asks</dt>
+          <dt>Question</dt>
           <dd>{asks}</dd>
         </div>
         <div className="sf-learn-interpretation__item">
-          <dt>How to read it</dt>
+          <dt>Read the result</dt>
           <dd>{reads}</dd>
         </div>
         <div className="sf-learn-interpretation__item sf-learn-interpretation__item--limit">
-          <dt>What it cannot prove</dt>
+          <dt>Limit</dt>
           <dd>{cannot}</dd>
         </div>
       </dl>
@@ -97,35 +97,35 @@ function OverfittingExplainer() {
     () =>
       Array.from({ length: 10 }, (_, index) => {
         const level = index + 1;
-        const train = clamp(0.64 + level * 0.034);
-        const unseen = clamp(0.67 + level * 0.058 - level * level * 0.0052);
-        return { level, train, unseen };
+        const trainLoss = clamp(0.38 - level * 0.027, 0.08, 0.5);
+        const auditLoss = clamp(0.36 - level * 0.05 + level * level * 0.006, 0.08, 0.6);
+        return { level, trainLoss, auditLoss };
       }),
     [],
   );
   const active = points[complexity - 1];
-  const gap = active.train - active.unseen;
+  const gap = active.auditLoss - active.trainLoss;
 
   return (
     <ConceptFrame
       number="01"
-      eyebrow="The central problem"
-      title="Overfitting: practice is easier than the exam"
+      eyebrow="Train versus audit"
+      title="Training loss versus unseen loss"
       summary="A flexible model can learn real structure, but it can also learn accidents that only occurred in its training rows."
       formula={
         <>
-          generalization gap = train score − unseen score = {asPercent(gap, 1)}
+          G = L<sub>audit</sub> − L<sub>train</sub> = {gap.toFixed(3)}
         </>
       }
       asks="Does the model keep its performance on rows that had no part in fitting or tuning it?"
-      reads="Move model flexibility to the right. Training performance usually rises; concern begins when the unseen score stalls or falls and the gap opens."
+      reads="Move model flexibility to the right. Training loss usually falls. Concern begins when unseen loss rises and the paired loss gap opens."
       cannot="One small train/test gap does not certify a model. A lucky split, duplicated rows, leakage, or a shifted future population can still mislead it."
     >
       <div className="sf-learn-control">
         <label htmlFor="sf-learn-complexity">
           Model flexibility
           <output htmlFor="sf-learn-complexity">
-            {complexity <= 3 ? "simple" : complexity <= 6 ? "moderate" : "high"} · {complexity}/10
+            {complexity <= 3 ? "simple" : complexity <= 6 ? "moderate" : "high"}, {complexity}/10
           </output>
         </label>
         <input
@@ -142,9 +142,9 @@ function OverfittingExplainer() {
       <div
         className="sf-learn-overfit-plot"
         role="img"
-        aria-label={`At flexibility ${complexity}, training score is ${asPercent(active.train, 1)} and unseen score is ${asPercent(active.unseen, 1)}. The generalization gap is ${asPercent(gap, 1)}.`}
+        aria-label={`At flexibility ${complexity}, training loss is ${active.trainLoss.toFixed(3)} and unseen loss is ${active.auditLoss.toFixed(3)}. The generalization gap is ${gap.toFixed(3)}.`}
       >
-        <div className="sf-learn-axis-label sf-learn-axis-label--top">better score</div>
+        <div className="sf-learn-axis-label sf-learn-axis-label--top">lower loss is better</div>
         <div className="sf-learn-overfit-plot__columns" aria-hidden="true">
           {points.map((point) => (
             <div
@@ -155,11 +155,11 @@ function OverfittingExplainer() {
             >
               <span
                 className="sf-learn-overfit-plot__point sf-learn-overfit-plot__point--train"
-                style={{ bottom: `${point.train * 100}%` }}
+                style={{ bottom: `${(1 - point.trainLoss) * 100}%` }}
               />
               <span
                 className="sf-learn-overfit-plot__point sf-learn-overfit-plot__point--unseen"
-                style={{ bottom: `${point.unseen * 100}%` }}
+                style={{ bottom: `${(1 - point.auditLoss) * 100}%` }}
               />
               <span className="sf-learn-overfit-plot__tick">{point.level}</span>
             </div>
@@ -173,11 +173,11 @@ function OverfittingExplainer() {
       <div className="sf-learn-legend" aria-label="Chart legend">
         <span>
           <i className="sf-learn-key sf-learn-key--train" aria-hidden="true" />
-          Training rows <strong>{asPercent(active.train, 1)}</strong>
+          Training loss <strong>{active.trainLoss.toFixed(3)}</strong>
         </span>
         <span>
           <i className="sf-learn-key sf-learn-key--unseen" aria-hidden="true" />
-          Unseen rows <strong>{asPercent(active.unseen, 1)}</strong>
+          Unseen loss <strong>{active.auditLoss.toFixed(3)}</strong>
         </span>
       </div>
     </ConceptFrame>
@@ -205,27 +205,25 @@ function NoiseInjectionExplainer() {
           0.03,
           0.97,
         ) * 100,
-        y: clamp(
-          (point.y + deterministicNoise(index, 19) * severity * 0.42) / 100,
-          0.04,
-          0.96,
-        ) * 100,
+        y: point.y,
       })),
     [basePoints, severity],
   );
-  const cleanSkill = 0.91;
-  const stressedSkill = clamp(cleanSkill - (severity / 100) * 0.31 - (severity / 100) ** 2 * 0.13);
-  const retainedSkill = stressedSkill / cleanSkill;
+  const referenceLoss = 0.3;
+  const cleanLoss = 0.18;
+  const stressedLoss = cleanLoss + (severity / 100) * 0.09 + (severity / 100) ** 2 * 0.05;
+  const normalization = referenceLoss - cleanLoss;
+  const retainedSkill = 1 - (stressedLoss - cleanLoss) / normalization;
 
   return (
     <ConceptFrame
       number="02"
-      eyebrow="Controlled damage"
-      title="Noise injection: nudge the inputs and watch the response"
-      summary="We add measured errors to features—like a noisy sensor or rounded value—without touching the hidden answer."
+      eyebrow="Feature perturbation"
+      title="Adding noise to numeric inputs"
+      summary="We add measured errors to features, such as a noisy sensor or rounded value, without changing the hidden answer."
       formula={
         <>
-          retained skill(s) = stressed score ÷ clean score = {retainedSkill.toFixed(2)}
+          R = 1 − (L<sub>stress</sub> − L<sub>clean</sub>) ÷ D = {retainedSkill.toFixed(2)}
         </>
       }
       asks="Is the fitted model relying on a signal that collapses under small, plausible measurement errors?"
@@ -235,7 +233,7 @@ function NoiseInjectionExplainer() {
       <div className="sf-learn-control">
         <label htmlFor="sf-learn-noise">
           Noise severity
-          <output htmlFor="sf-learn-noise">{severity}% of one feature standard deviation</output>
+          <output htmlFor="sf-learn-noise">{severity}% of each feature&apos;s typical training spread</output>
         </label>
         <input
           id="sf-learn-noise"
@@ -278,9 +276,9 @@ function NoiseInjectionExplainer() {
       </div>
 
       <div className="sf-learn-readout">
-        <span>Clean skill <strong>{asPercent(cleanSkill, 1)}</strong></span>
-        <span>Stressed skill <strong>{asPercent(stressedSkill, 1)}</strong></span>
-        <span>Retained <strong>{asPercent(retainedSkill, 1)}</strong></span>
+        <span>Clean loss <strong>{cleanLoss.toFixed(3)}</strong></span>
+        <span>Stressed loss <strong>{stressedLoss.toFixed(3)}</strong></span>
+        <span>Performance retained <strong>{asPercent(retainedSkill, 1)}</strong></span>
       </div>
     </ConceptFrame>
   );
@@ -302,28 +300,28 @@ function MonteCarloExplainer() {
     [],
   );
   const scores = allScores.slice(0, runs);
-  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const center = quantile(scores, 0.5);
   const low = quantile(scores, 0.05);
   const high = quantile(scores, 0.95);
 
   return (
     <ConceptFrame
       number="03"
-      eyebrow="Repeat, do not guess"
-      title="Monte Carlo: run the same fair test many times"
-      summary="A single train/test split is one roll of the dice. Monte Carlo testing repeats the split with controlled random seeds to expose that luck."
+      eyebrow="Repeated holdout"
+      title="Why the audit repeats the split"
+      summary="A single train and audit split depends on which rows happened to land on each side. Repeated splits show that sensitivity."
       formula={
         <>
-          mean score = (score₁ + … + score<sub>{runs}</sub>) ÷ {runs} = {mean.toFixed(3)}
+          typical score = median(score₁, …, score<sub>{runs}</sub>) = {center.toFixed(3)}
         </>
       }
       asks="How much would the reported model score change if different eligible rows happened to land in the unseen set?"
-      reads="Each dot is one complete repeat. A narrow cluster means the estimate is stable; a wide cluster means the headline score depends heavily on the split."
-      cannot="More repeats reduce Monte Carlo uncertainty, but they do not repair biased sampling, leakage, time drift, or a test set drawn from the wrong population."
+      reads="Each dot is one complete repeat. StressFold reports the median and the 5th to 95th percentile range. A wide cluster means the result depends heavily on the split."
+      cannot="These holdouts overlap, so they are not independent new datasets. More repeats stabilize this resampling summary but do not repair bias, leakage, or time drift."
     >
       <div className="sf-learn-control">
         <label htmlFor="sf-learn-runs">
-          Independent repeats
+          Protocol repeats
           <output htmlFor="sf-learn-runs">{runs} runs</output>
         </label>
         <input
@@ -340,7 +338,7 @@ function MonteCarloExplainer() {
       <div
         className="sf-learn-monte-carlo"
         role="img"
-        aria-label={`${runs} repeated holdout scores. The first split scores ${asPercent(scores[0], 1)}. Their mean is ${asPercent(mean, 1)}, with a fifth to ninety-fifth percentile range from ${asPercent(low, 1)} to ${asPercent(high, 1)}.`}
+        aria-label={`${runs} repeated holdout scores. The first split scores ${asPercent(scores[0], 1)}. Their median is ${asPercent(center, 1)}, with a fifth to ninety-fifth percentile range from ${asPercent(low, 1)} to ${asPercent(high, 1)}.`}
       >
         <div className="sf-learn-monte-carlo__scale" aria-hidden="true">
           <span>60%</span>
@@ -366,16 +364,16 @@ function MonteCarloExplainer() {
             </span>
           ))}
           <span
-            className="sf-learn-monte-carlo__mean"
-            style={{ left: `${clamp((mean - 0.58) / 0.38) * 100}%` }}
+            className="sf-learn-monte-carlo__median"
+            style={{ left: `${clamp((center - 0.58) / 0.38) * 100}%` }}
           />
         </div>
       </div>
 
       <div className="sf-learn-readout">
         <span>One split <strong>{asPercent(scores[0], 1)}</strong></span>
-        <span>Mean of {runs} <strong>{asPercent(mean, 1)}</strong></span>
-        <span>Middle 90% <strong>{asPercent(low, 1)}–{asPercent(high, 1)}</strong></span>
+        <span>Median of {runs} <strong>{asPercent(center, 1)}</strong></span>
+        <span>Middle 90% <strong>{asPercent(low, 1)} to {asPercent(high, 1)}</strong></span>
       </div>
     </ConceptFrame>
   );
@@ -395,21 +393,24 @@ function LabelPermutationExplainer() {
   const permutedLabels = PERMUTATION_ORDERS[round].map((index) => ORIGINAL_LABELS[index]);
   const originalScore = 0.84;
   const permutedScore = PERMUTED_SCORES[round];
+  const correctedPercentile =
+    (100 * (1 + PERMUTED_SCORES.filter((score) => score <= originalScore).length)) /
+    (PERMUTED_SCORES.length + 1);
 
   return (
     <ConceptFrame
       number="04"
-      eyebrow="A deliberate nonsense test"
-      title="Label permutation: break the answer on purpose"
-      summary="We shuffle the answers between rows, destroying any real feature-to-answer relationship, then rerun the entire modelling procedure."
+      eyebrow="Null comparison"
+      title="Why the audit shuffles answers"
+      summary="Within each repeated split, we shuffle the training answers and refit the model on the same prepared feature rows."
       formula={
         <>
-          null excess = shuffled score − chance = {(permutedScore - 0.5).toFixed(2)}
+          P = 100 × (1 + # null scores ≤ real score) ÷ (B + 1) = {correctedPercentile.toFixed(0)}
         </>
       }
       asks="Can this pipeline still appear predictive after we deliberately remove the real signal it is supposed to learn?"
-      reads="For balanced yes/no data, shuffled performance should settle near 50%. Persistently high scores point toward leakage, invalid selection, or a broken evaluation loop."
-      cannot="A passed permutation check does not prove the original relationship is causal, useful, or stable. It only shows this particular nonsense test did not expose the pipeline."
+      reads="For balanced yes or no data, shuffled AUROC should settle near 50%. The corrected percentile ranks the real score against all shuffled runs with a plus one correction."
+      cannot="A passed permutation check does not prove the original relationship is causal, useful, or stable. It only shows this particular null check did not expose the pipeline."
     >
       <div className="sf-learn-permutation">
         <div className="sf-learn-permutation__table-wrap">
@@ -501,7 +502,7 @@ const SYNTHETIC_SCENARIOS: Record<
       x: point.x,
       y: all[(index * 5 + 3) % all.length].y,
     })),
-    verdict: "Useful for testing simple range changes—not as a faithful replica of the data-generating process.",
+    verdict: "Useful for testing simple range changes. It is not a faithful replica of the process that produced the data.",
   },
   structure: {
     label: "Preserves structure",
@@ -513,7 +514,7 @@ const SYNTHETIC_SCENARIOS: Record<
       x: clamp((point.x + deterministicNoise(index, 43) * 6) / 100, 0.04, 0.96) * 100,
       y: clamp((point.y + deterministicNoise(index, 47) * 7) / 100, 0.04, 0.96) * 100,
     })),
-    verdict: "A plausible stress-data candidate—provided downstream utility and subgroup behavior are checked too.",
+    verdict: "A plausible stress data candidate, provided downstream utility and subgroup behavior are checked too.",
   },
   copies: {
     label: "Copies records",
@@ -536,8 +537,8 @@ function SyntheticDataExplainer() {
   return (
     <ConceptFrame
       number="05"
-      eyebrow="Generated data, with boundaries"
-      title="Synthetic data: plausible is not the same as new evidence"
+      eyebrow="Optional generator check"
+      title="Generated data is a separate validation problem"
       summary="A generator can create useful stress cases. Before trusting them, check distributions, relationships, downstream behavior, and whether it merely copied real rows."
       formula={
         <>
@@ -581,7 +582,7 @@ function SyntheticDataExplainer() {
           </div>
         </div>
         <div>
-          <p>Generated data · {selected.label}</p>
+          <p>Generated data, {selected.label}</p>
           <div
             className="sf-learn-synthetic__plot"
             role="img"
@@ -620,12 +621,11 @@ export function ConceptExplainers() {
   return (
     <section className="sf-learn" id="learn" aria-labelledby="sf-learn-title">
       <header className="sf-learn__intro">
-        <p className="sf-learn__kicker">Five ideas, no statistical shorthand required</p>
-        <h2 id="sf-learn-title">What StressFold is actually testing</h2>
+        <p className="sf-learn__kicker">Visual explanations</p>
+        <h2 id="sf-learn-title">Explore how each test behaves.</h2>
         <p>
-          No single number can announce “this model is overfit.” These tests ask different,
-          narrower questions. Together they reveal whether a result survives unseen rows,
-          measurement errors, repeated sampling, deliberate nonsense, and generated stress cases.
+          Move the controls to see the ideas behind the audit. The exact equations and symbol
+          definitions are in the mathematics section above.
         </p>
       </header>
 
@@ -638,7 +638,7 @@ export function ConceptExplainers() {
         <i aria-hidden="true">→</i>
         <span>Repeat</span>
         <i aria-hidden="true">→</i>
-        <span>Falsify</span>
+        <span>Shuffle labels</span>
       </div>
 
       <div className="sf-learn__cards">
