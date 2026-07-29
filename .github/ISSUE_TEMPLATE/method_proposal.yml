@@ -1,0 +1,37 @@
+name: Method proposal
+description: Propose an estimand, operator, split policy, or validation experiment.
+title: "[Method]: "
+labels: ["method"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Scientific question
+      description: What question should the proposed method answer?
+    validations:
+      required: true
+  - type: textarea
+    id: assumptions
+    attributes:
+      label: Estimand and assumptions
+      description: Define the unit under test, data assumptions, and intended interpretation.
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure mode
+      description: What failure should it reveal, and what counterexample could falsify the implementation?
+    validations:
+      required: true
+  - type: textarea
+    id: leakage
+    attributes:
+      label: Leakage and randomness
+      description: Where is the operator calibrated, and how should random draws be paired and recorded?
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References or prior implementations

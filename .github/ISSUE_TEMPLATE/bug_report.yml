@@ -1,0 +1,42 @@
+name: Bug report
+description: Report incorrect behavior, output, or reproducibility.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not attach sensitive datasets. For vulnerabilities, use the private
+        process in SECURITY.md.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened, including the smallest useful output excerpt?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include a small synthetic example, configuration, seed, and commands where possible.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: StressFold version or revision
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python or Node version, operating system, and relevant dependency versions.
