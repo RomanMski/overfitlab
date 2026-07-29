@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { correctedNullRank } from "../lib/analysis";
 
 type SyntheticScenario = "marginals" | "structure" | "copies";
 
@@ -393,9 +394,7 @@ function LabelPermutationExplainer() {
   const permutedLabels = PERMUTATION_ORDERS[round].map((index) => ORIGINAL_LABELS[index]);
   const originalScore = 0.84;
   const permutedScore = PERMUTED_SCORES[round];
-  const correctedPercentile =
-    (100 * (1 + PERMUTED_SCORES.filter((score) => score <= originalScore).length)) /
-    (PERMUTED_SCORES.length + 1);
+  const correctedPercentile = correctedNullRank(originalScore, PERMUTED_SCORES);
 
   return (
     <ConceptFrame
@@ -405,11 +404,11 @@ function LabelPermutationExplainer() {
       summary="Within each repeated split, we shuffle the training answers and refit the model on the same prepared feature rows."
       formula={
         <>
-          P = 100 × (1 + # null scores ≤ real score) ÷ (B + 1) = {correctedPercentile.toFixed(0)}
+          P = 100 × (½ + # lower + ½ × # tied) ÷ (B + 1) = {correctedPercentile.toFixed(0)}
         </>
       }
       asks="Can this pipeline still appear predictive after we deliberately remove the real signal it is supposed to learn?"
-      reads="For balanced yes or no data, shuffled AUROC should settle near 50%. The corrected percentile ranks the real score against all shuffled runs with a plus one correction."
+      reads="For balanced yes or no data, shuffled AUROC should settle near 50%. The corrected percentile ranks the real score against all shuffled runs; exact ties receive half weight."
       cannot="A passed permutation check does not prove the original relationship is causal, useful, or stable. It only shows this particular null check did not expose the pipeline."
     >
       <div className="sf-learn-permutation">

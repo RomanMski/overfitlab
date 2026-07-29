@@ -101,7 +101,32 @@ def test_result_exposes_paired_summaries_and_generalization_gap(
     assert gaps["gap"].notna().all()
     permutation = result.permutation_summary()
     assert set(permutation["metric"]) == {"roc_auc", "log_loss"}
-    assert permutation["plus_one_p"].between(0, 1).all()
+    assert "plus_one_p" not in permutation.columns
+    assert permutation["pooled_paired_exceedance_rate"].between(0, 1).all()
+    assert set(permutation["repeat_count"]) == {3}
+    assert set(permutation["null_fits_per_repeat_min"]) == {2}
+    assert set(permutation["null_fits_per_repeat_max"]) == {2}
+
+    roc_rows: dict[int, list[dict]] = {}
+    for record in result.records:
+        if (
+            record["experiment"] == "permutation_null"
+            and record["evaluation"] == "test"
+            and record["metric"] == "roc_auc"
+        ):
+            roc_rows.setdefault(int(record["repeat"]), []).append(record)
+    prescribed = ([0.1, float("nan")], [0.2, 0.4], [0.6, 0.8])
+    for values, repeat in zip(prescribed, sorted(roc_rows), strict=True):
+        ordered = sorted(
+            roc_rows[repeat], key=lambda row: row["scenario_repeat"]
+        )
+        for value, record in zip(values, ordered, strict=True):
+            record["value"] = value
+    unequal = result.permutation_summary().set_index("metric").loc["roc_auc"]
+    assert unequal["null_mean"] == pytest.approx((0.1 + 0.3 + 0.7) / 3)
+    assert unequal["null_mean"] != pytest.approx((0.1 + 0.2 + 0.4 + 0.6 + 0.8) / 5)
+    assert unequal["null_fits_per_repeat_min"] == 1
+    assert unequal["null_fits_per_repeat_max"] == 2
 
 
 def test_variant_export_contains_source_rows_and_manifest(

@@ -6,7 +6,7 @@ The browser lab is a local, bounded implementation of the StressFold idea. It is
 
 The lab:
 
-- accepts CSV files up to 5 MB;
+- accepts CSV files up to 5 MB and 5,000 data rows, rejecting larger tables rather than silently truncating them;
 - supports binary classification and numeric-target regression;
 - audits numeric predictors and reports ignored non-numeric or identifier-like columns;
 - offers a regularized linear/logistic reference model and a high-capacity nearest-neighbor comparison;
@@ -31,7 +31,7 @@ These variants are stress instruments. They do not estimate a new population, in
 | --- | --- | --- |
 | Estimators | Two built-in references | Any compatible estimator or pipeline |
 | Predictors | Numeric | Numeric, categorical, or mixed when the supplied pipeline supports them |
-| Input size | 5 MB guardrail | Limited by the local Python process |
+| Input size | 5 MB and 5,000-row guardrails | Limited by the local Python process |
 | Protocol control | Bounded UI presets and controls | Explicit `AuditConfig` and `StressSuite` |
 | Artifacts | HTML, JSON, one-off variants | HTML, JSON, pandas tables, full retained variant set |
 | Implementation | TypeScript, in browser | Python, NumPy/pandas/scikit-learn |

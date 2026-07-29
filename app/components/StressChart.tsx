@@ -420,7 +420,7 @@ export function StressChart({ curves }: StressChartProps) {
       </div>
 
       <p className="chart-note">
-        Performance retained compares stressed loss with clean loss. The scale is normalized by the clean model&apos;s advantage over a constant predictor, with a 1% floor when that advantage is very small. At 100%, stressed and clean loss match. Values below 0% or above 100% mean the loss changed by more than the normalization margin. The shaded band is the empirical 5th to 95th percentile across repeated paired splits. It is not generated extra data.
+        Performance retained compares stressed loss with clean loss. The scale is normalized by the clean model&apos;s advantage over a constant predictor, with a 1% floor when that advantage is very small. At 100%, stressed and clean loss match. Values below 0% or above 100% mean the loss changed by more than the normalization margin. If the clean baseline does not reliably beat the reference, the lab withholds curve rankings. The shaded band is the empirical 5th to 95th percentile across repeated paired splits. It is not generated extra data.
       </p>
     </div>
   );

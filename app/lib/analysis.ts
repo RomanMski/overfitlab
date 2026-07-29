@@ -70,6 +70,9 @@ export interface AuditResult {
     auditLoss: number;
     gap: number;
     splitSpread: number;
+    referenceLoss: number;
+    referenceAdvantage: number;
+    retainedSkillReliable: boolean;
   };
   permutation: {
     observed: number;
@@ -97,9 +100,14 @@ interface PreparedData {
   y: number[];
   features: string[];
   ignored: string[];
+  identifierColumns: string[];
+  unsupportedColumns: string[];
   labels?: [string, string];
   classBalance?: number;
   missingRate: number;
+  duplicateFeatureRate: number;
+  repeatedEntity?: { column: string; rate: number };
+  targetProxy?: { feature: string; strength: number };
 }
 
 interface FittedModel {
@@ -213,6 +221,9 @@ export async function runAudit(
   const auditLosses: number[] = [];
   const baselineScores: number[] = [];
   const permutationScores: number[] = [];
+  const referenceLosses: number[] = [];
+  const referenceAdvantages: number[] = [];
+  let adequateReferenceRepeats = 0;
 
   for (let repeat = 0; repeat < repeats; repeat += 1) {
     const repeatSeed = mixSeed(settings.seed, repeat + 1);
@@ -233,6 +244,11 @@ export async function runAudit(
     trainLosses.push(trainMetric.loss);
     auditLosses.push(testMetric.loss);
     baselineScores.push(testMetric.score);
+    referenceLosses.push(referenceLoss);
+    referenceAdvantages.push(referenceLoss - testMetric.loss);
+    if (referenceLoss - testMetric.loss > Math.max(referenceLoss * 0.01, 1e-8)) {
+      adequateReferenceRepeats += 1;
+    }
 
     for (const id of curveSamples.keys()) {
       curveSamples.get(id)?.get(0)?.push(1);
@@ -292,9 +308,7 @@ export async function runAudit(
   const scoreSpread = quantile(baselineScores, 0.95) - quantile(baselineScores, 0.05);
   const observed = median(baselineScores);
   const nullMedian = median(permutationScores);
-  const percentile =
-    (100 * (1 + permutationScores.filter((score) => score <= observed).length)) /
-    (permutationScores.length + 1);
+  const percentile = correctedNullRank(observed, permutationScores);
   const baseline = {
     scoreLabel: settings.task === "classification" ? ("AUROC" as const) : ("R²" as const),
     score: observed,
@@ -303,9 +317,12 @@ export async function runAudit(
     auditLoss: median(auditLosses),
     gap: median(gapSamples),
     splitSpread: scoreSpread,
+    referenceLoss: median(referenceLosses),
+    referenceAdvantage: median(referenceAdvantages),
+    retainedSkillReliable: adequateReferenceRepeats >= Math.ceil(repeats * 0.75),
   };
   const warnings = buildWarnings(table, prepared, baseline, percentile);
-  const findings = buildFindings(baseline, summaries, percentile, nullMedian, settings.task);
+  const findings = buildFindings(prepared, baseline, summaries, percentile, nullMedian, settings.task);
 
   return {
     dataset: {
@@ -335,7 +352,7 @@ export async function runAudit(
       model: settings.model,
       sourceHash: fingerprint(table),
       generatedAt: new Date().toISOString(),
-      browserEngine: "StressFold browser protocol 0.2",
+      browserEngine: "StressFold browser protocol 0.3",
     },
   };
 }
@@ -400,13 +417,22 @@ function prepareData(table: DataTable, settings: AuditSettings): PreparedData {
   const usableRows = table.rows.filter((row) => row[settings.target] !== null && row[settings.target] !== "");
   const features: string[] = [];
   const ignored: string[] = [];
+  const identifierColumns: string[] = [];
+  const unsupportedColumns: string[] = [];
   for (const header of table.headers) {
     if (header === settings.target) continue;
     const values = usableRows.map((row) => row[header]);
     const numeric = values.filter((value) => Number.isFinite(toNumber(value))).length;
     const looksLikeId = /(^id$|_id$|^index$|uuid|identifier|row_number)/i.test(header);
-    if (!looksLikeId && numeric >= Math.max(10, usableRows.length * 0.75)) features.push(header);
-    else ignored.push(header);
+    if (looksLikeId) {
+      ignored.push(header);
+      identifierColumns.push(header);
+    } else if (numeric >= Math.max(10, usableRows.length * 0.75)) {
+      features.push(header);
+    } else {
+      ignored.push(header);
+      unsupportedColumns.push(header);
+    }
   }
 
   let missing = 0;
@@ -425,19 +451,39 @@ function prepareData(table: DataTable, settings: AuditSettings): PreparedData {
     if (unique.length !== 2) throw new Error(`Binary classification requires exactly two target values; found ${unique.length}.`);
     labels = [unique[0], unique[1]];
     y = usableRows.map((row) => (String(row[settings.target]) === unique[1] ? 1 : 0));
+    const classCounts = [
+      y.filter((value) => value === 0).length,
+      y.filter((value) => value === 1).length,
+    ];
+    if (Math.min(...classCounts) < 8) {
+      throw new Error(
+        `Binary classification requires at least 8 rows in each class for repeated stratified stress tests; found ${classCounts[0]} and ${classCounts[1]}.`,
+      );
+    }
     classBalance = mean(y);
   } else {
     y = usableRows.map((row) => toNumber(row[settings.target]));
     if (y.some((value) => !Number.isFinite(value))) throw new Error("Regression targets must be numeric.");
+    if (new Set(y).size < 2) {
+      throw new Error("Regression requires a target with non-zero variance.");
+    }
   }
+  const duplicateFeatureRate = exactDuplicateRate(X);
+  const repeatedEntity = strongestRepeatedIdentifier(usableRows, identifierColumns);
+  const targetProxy = strongestTargetProxy(X, y, features, settings.task);
   return {
     X,
     y,
     features,
     ignored,
+    identifierColumns,
+    unsupportedColumns,
     labels,
     classBalance,
     missingRate: X.length && features.length ? missing / (X.length * features.length) : 0,
+    duplicateFeatureRate,
+    repeatedEntity,
+    targetProxy,
   };
 }
 
@@ -498,7 +544,10 @@ function fitRegularizedModel(task: TaskType, X: number[][], y: number[], rng: ()
   const iterations = task === "classification" ? 170 : 220;
   const learningRate = task === "classification" ? 0.12 : 0.055;
   const targetMean = task === "regression" ? mean(y) : 0;
-  const targetScale = task === "regression" ? Math.sqrt(mean(y.map((value) => (value - targetMean) ** 2))) || 1 : 1;
+  const targetRange = task === "regression" ? Math.max(...y) - Math.min(...y) : 1;
+  const targetScale = task === "regression"
+    ? Math.sqrt(mean(y.map((value) => ((value - targetMean) / targetRange) ** 2))) * targetRange || targetRange || 1
+    : 1;
   const trainTarget = task === "regression" ? y.map((value) => (value - targetMean) / targetScale) : y;
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -551,8 +600,15 @@ function fitNearestNeighbor(task: TaskType, X: number[][], y: number[]): FittedM
 function evaluate(task: TaskType, truth: number[], prediction: number[]) {
   const loss = mean(truth.map((value, index) => (value - prediction[index]) ** 2));
   if (task === "classification") return { loss, score: auc(truth, prediction) };
-  const variance = mean(truth.map((value) => (value - mean(truth)) ** 2));
-  return { loss, score: variance > 1e-12 ? 1 - loss / variance : 0 };
+  const minimum = Math.min(...truth);
+  const range = Math.max(...truth) - minimum;
+  if (!(range > 0)) return { loss, score: 0 };
+  const scaledTruth = truth.map((value) => (value - minimum) / range);
+  const scaledPrediction = prediction.map((value) => (value - minimum) / range);
+  const scaledMean = mean(scaledTruth);
+  const variance = mean(scaledTruth.map((value) => (value - scaledMean) ** 2));
+  const scaledLoss = mean(scaledTruth.map((value, index) => (value - scaledPrediction[index]) ** 2));
+  return { loss, score: variance > 0 ? 1 - scaledLoss / variance : 0 };
 }
 
 function constantReferenceLoss(task: TaskType, trainY: number[], testY: number[]) {
@@ -668,14 +724,30 @@ function buildWarnings(
     warnings.push("Rare class: repeated splits can be unstable; consider grouped or nested evaluation.");
   }
   if (data.missingRate > 0.05) warnings.push(`${formatPercent(data.missingRate)} of numeric feature cells were median-imputed inside each training split.`);
-  if (data.ignored.length) warnings.push(`${data.ignored.length} non-numeric or identifier-like column${data.ignored.length === 1 ? " was" : "s were"} excluded in the browser lab.`);
+  if (data.identifierColumns.length) {
+    warnings.push(`Identifier columns excluded from modeling: ${data.identifierColumns.join(", ")}.`);
+  }
+  if (data.unsupportedColumns.length) {
+    warnings.push(`Unsupported non-numeric or sparse columns excluded: ${data.unsupportedColumns.join(", ")}. Browser results cover only the numeric predictors listed in the run context.`);
+  }
+  if (data.duplicateFeatureRate >= 0.02) {
+    warnings.push(`${formatPercent(data.duplicateFeatureRate)} of usable rows repeat an exact numeric predictor pattern. This can be ordinary for discrete data; if the rows are copies or repeated entities, use a group-aware split.`);
+  }
+  if (data.repeatedEntity) {
+    warnings.push(`${data.repeatedEntity.column} repeats across ${formatPercent(data.repeatedEntity.rate)} of usable rows. Random row splits can place the same entity in training and audit data; use an entity-aware split.`);
+  }
+  if (data.targetProxy) {
+    warnings.push(`${data.targetProxy.feature} nearly determines the target by itself (${data.targetProxy.strength.toFixed(3)} univariate ${data.classBalance === undefined ? "absolute correlation" : "oriented AUROC"}). Check whether it is target-derived or unavailable at prediction time.`);
+  }
   if (baseline.gap > Math.max(0.03, baseline.auditLoss * 0.3)) warnings.push("The train-audit loss gap is large relative to audit loss.");
+  if (!baseline.retainedSkillReliable) warnings.push("The clean baseline did not reliably beat a training-fold constant predictor. Its normalized retained-skill curves are unstable; inspect raw loss and model specification before ranking stressors.");
   if (percentile < 90) warnings.push("The observed score is not clearly separated from the label-permutation null in this quick run.");
   if (table.rows.length > data.X.length) warnings.push(`${table.rows.length - data.X.length} rows with missing targets were excluded.`);
   return warnings;
 }
 
 function buildFindings(
+  data: PreparedData,
   baseline: AuditResult["baseline"],
   summaries: StressSummary[],
   percentile: number,
@@ -683,33 +755,125 @@ function buildFindings(
   task: TaskType,
 ): AuditFinding[] {
   const weakest = [...summaries].sort((a, b) => b.degradationArea - a.degradationArea)[0];
+  const leakageConcern = data.repeatedEntity !== undefined || data.targetProxy !== undefined;
   const gapRatio = baseline.auditLoss ? baseline.gap / baseline.auditLoss : 0;
-  const gapStatus = gapRatio > 0.35 ? "warning" : gapRatio > 0.18 ? "watch" : "stable";
-  const robustnessStatus = weakest.degradationArea > 0.55 ? "warning" : weakest.degradationArea > 0.25 ? "watch" : "stable";
+  const gapStatus = leakageConcern ? "warning" : gapRatio > 0.35 ? "warning" : gapRatio > 0.18 ? "watch" : "stable";
+  const robustnessStatus = !baseline.retainedSkillReliable ? "warning" : weakest.degradationArea > 0.55 ? "warning" : weakest.degradationArea > 0.25 ? "watch" : "stable";
   const nullStatus = percentile >= 95 ? "stable" : percentile >= 85 ? "watch" : "warning";
   return [
     {
       kind: "generalization",
       eyebrow: "Generalization",
-      title: gapStatus === "stable" ? "Clean split gap is contained" : "Clean split gap needs attention",
-      detail: `The median paired audit loss minus training loss gap is ${formatNumber(baseline.gap, 3)}. Its positive part is ${formatPercent(Math.max(0, gapRatio))} of audit loss. This is descriptive evidence, not a proof of overfitting.`,
+      title: leakageConcern ? "Check possible split leakage first" : gapStatus === "stable" ? "Clean split gap is contained" : "Clean split gap needs attention",
+      detail: leakageConcern
+        ? "A repeated entity identifier or a near-perfect single-feature proxy can make random row splits look unrealistically strong. Resolve that warning before treating the held-out score as generalization evidence."
+        : `The median paired audit loss minus training loss gap is ${formatNumber(baseline.gap, 3)}. Its positive part is ${formatPercent(Math.max(0, gapRatio))} of audit loss. This is descriptive evidence, not a proof of overfitting.`,
       status: gapStatus,
     },
     {
       kind: "robustness",
       eyebrow: "Robustness",
-      title: `${weakest.label} has the largest curve decline`,
-      detail: `Its normalized curve area is ${formatNumber(weakest.degradationArea, 2)} on the tested grid. This comparison organizes the four plots; it does not claim that unlike stress levels have equal real-world severity.`,
+      title: baseline.retainedSkillReliable ? `${weakest.label} has the largest curve decline` : "Retained-skill ranking is not interpretable",
+      detail: baseline.retainedSkillReliable
+        ? `Its normalized curve area is ${formatNumber(weakest.degradationArea, 2)} on the tested grid. This comparison organizes the four plots; it does not claim that unlike stress levels have equal real-world severity.`
+        : `The median clean advantage over the constant reference is ${formatNumber(baseline.referenceAdvantage, 3)} loss units, so dividing stress changes by that margin is unstable. Improve or replace the baseline before ranking the four stress curves.`,
       status: robustnessStatus,
     },
     {
       kind: "falsification",
       eyebrow: "Falsification",
       title: nullStatus === "stable" ? "Observed signal clears the quick null" : "Null separation is inconclusive",
-      detail: `The observed ${baseline.scoreLabel} has a corrected null rank of ${formatNumber(percentile, 0)} on a 0 to 100 scale against ${task === "classification" ? "label-permuted" : "target-permuted"} refits; null median ${formatNumber(nullMedian, 3)}. This is a quick rank, not a permutation p-value. Increase permutations before publication or decision use.`,
+      detail: `The observed ${baseline.scoreLabel} has a tie-adjusted null rank of ${formatNumber(percentile, 0)} on a 0 to 100 scale against ${task === "classification" ? "label-permuted" : "target-permuted"} refits; null median ${formatNumber(nullMedian, 3)}. This is a quick rank, not a permutation p-value. Increase permutations before publication or decision use.`,
       status: nullStatus,
     },
   ];
+}
+
+function exactDuplicateRate(X: number[][]) {
+  const keys = X.map((row) =>
+    JSON.stringify(row.map((value) => (Number.isFinite(value) ? value : null))),
+  );
+  return keys.length ? (keys.length - new Set(keys).size) / keys.length : 0;
+}
+
+function strongestRepeatedIdentifier(
+  rows: Record<string, CellValue>[],
+  columns: string[],
+): { column: string; rate: number } | undefined {
+  let strongest: { column: string; rate: number } | undefined;
+  for (const column of columns) {
+    const values = rows
+      .map((row) => row[column])
+      .filter((value): value is string | number => value !== null && value !== "")
+      .map(String);
+    if (values.length < 20) continue;
+    const rate = (values.length - new Set(values).size) / values.length;
+    if (rate >= 0.02 && (!strongest || rate > strongest.rate)) {
+      strongest = { column, rate };
+    }
+  }
+  return strongest;
+}
+
+function strongestTargetProxy(
+  X: number[][],
+  y: number[],
+  features: string[],
+  task: TaskType,
+): { feature: string; strength: number } | undefined {
+  let strongest: { feature: string; strength: number } | undefined;
+  for (let column = 0; column < features.length; column += 1) {
+    const pairs = X
+      .map((row, index) => ({ value: row[column], target: y[index] }))
+      .filter((pair) => Number.isFinite(pair.value));
+    if (pairs.length < 20) continue;
+    let strength: number;
+    if (task === "classification") {
+      const raw = auc(
+        pairs.map((pair) => pair.target),
+        pairs.map((pair) => pair.value),
+      );
+      strength = Math.max(raw, 1 - raw);
+    } else {
+      strength = Math.abs(
+        pearson(
+          pairs.map((pair) => pair.value),
+          pairs.map((pair) => pair.target),
+        ),
+      );
+    }
+    if (!strongest || strength > strongest.strength) {
+      strongest = { feature: features[column], strength };
+    }
+  }
+  return strongest && strongest.strength >= 0.995 ? strongest : undefined;
+}
+
+function pearson(left: number[], right: number[]) {
+  const leftMean = mean(left);
+  const rightMean = mean(right);
+  const leftScale = Math.max(...left.map((value) => Math.abs(value - leftMean))) || 1;
+  const rightScale = Math.max(...right.map((value) => Math.abs(value - rightMean))) || 1;
+  let numerator = 0;
+  let leftSquares = 0;
+  let rightSquares = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftDelta = (left[index] - leftMean) / leftScale;
+    const rightDelta = (right[index] - rightMean) / rightScale;
+    numerator += leftDelta * rightDelta;
+    leftSquares += leftDelta ** 2;
+    rightSquares += rightDelta ** 2;
+  }
+  const denominator = Math.sqrt(leftSquares * rightSquares);
+  return denominator > 0 ? numerator / denominator : 0;
+}
+
+export function correctedNullRank(observed: number, nullScores: number[]) {
+  if (!nullScores.length) return 50;
+  const tolerance = 1e-12 * Math.max(1, Math.abs(observed), ...nullScores.map(Math.abs));
+  const lower = nullScores.filter((score) => score < observed - tolerance).length;
+  const tied = nullScores.filter((score) => Math.abs(score - observed) <= tolerance).length;
+  return (100 * (0.5 + lower + 0.5 * tied)) / (nullScores.length + 1);
 }
 
 function makeManifest(
@@ -736,7 +900,7 @@ function makeManifest(
 }
 
 function fingerprint(table: DataTable) {
-  const text = JSON.stringify({ headers: table.headers, rows: table.rows.slice(0, 2000) });
+  const text = JSON.stringify({ headers: table.headers, rows: table.rows });
   let hash = 2166136261;
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.charCodeAt(index);

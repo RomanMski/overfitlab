@@ -1921,6 +1921,30 @@ summary:focus-visible {
   background: var(--teal-open);
 }
 
+.audit-warning-strip {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--amber);
+  background: var(--amber-open);
+}
+
+.audit-warning-strip strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.audit-warning-strip ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.audit-warning-strip li + li {
+  margin-top: 4px;
+}
+
 .result-answer > span {
   color: var(--teal-dark);
   font-family: var(--font-geist-mono), monospace;

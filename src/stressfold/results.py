@@ -214,7 +214,12 @@ class AuditResult:
         return pd.DataFrame(rows)
 
     def permutation_summary(self) -> pd.DataFrame:
-        """Summarize how often a permuted-label model matched the paired baseline."""
+        """Summarize paired null fits without treating overlapping splits as independent.
+
+        ``null_mean`` and ``observed_mean`` weight each valid holdout once. The
+        explicitly named pooled exceedance rate remains fit-weighted and reports
+        its per-holdout fit-count range alongside it.
+        """
 
         frame = self.records_frame()
         null = frame[
@@ -223,7 +228,9 @@ class AuditResult:
         ]
         rows = []
         for metric, group in null.groupby("metric", sort=True):
-            valid = group[["value", "baseline_value"]].dropna()
+            valid = group[
+                ["repeat", "scenario_repeat", "value", "baseline_value"]
+            ].dropna()
             definition = METRICS[metric]
             if definition.higher_is_better:
                 exceed = valid["value"] >= valid["baseline_value"]
@@ -231,23 +238,50 @@ class AuditResult:
                 exceed = valid["value"] <= valid["baseline_value"]
             count = int(exceed.sum())
             n = int(len(valid))
+            fits_per_repeat = valid.groupby("repeat").size()
+            null_by_repeat = valid.groupby("repeat")["value"].mean()
+            observed_by_repeat = valid.groupby("repeat")["baseline_value"].first()
             rows.append(
                 {
                     "metric": metric,
                     "n": n,
-                    "null_mean": float(valid["value"].mean()) if n else float("nan"),
-                    "observed_mean": float(valid["baseline_value"].mean())
-                    if n
+                    "repeat_count": int(valid["repeat"].nunique()),
+                    "null_fits_per_repeat_min": int(fits_per_repeat.min())
+                    if len(fits_per_repeat)
+                    else 0,
+                    "null_fits_per_repeat_max": int(fits_per_repeat.max())
+                    if len(fits_per_repeat)
+                    else 0,
+                    "null_mean": float(null_by_repeat.mean())
+                    if len(null_by_repeat)
+                    else float("nan"),
+                    "observed_mean": float(observed_by_repeat.mean())
+                    if len(observed_by_repeat)
                     else float("nan"),
                     "paired_exceedances": count,
-                    "plus_one_p": (count + 1.0) / (n + 1.0),
+                    "pooled_paired_exceedance_rate": count / n
+                    if n
+                    else float("nan"),
                 }
             )
-        return pd.DataFrame(rows)
+        return pd.DataFrame(
+            rows,
+            columns=[
+                "metric",
+                "n",
+                "repeat_count",
+                "null_fits_per_repeat_min",
+                "null_fits_per_repeat_max",
+                "null_mean",
+                "observed_mean",
+                "paired_exceedances",
+                "pooled_paired_exceedance_rate",
+            ],
+        )
 
     def to_dict(self, *, include_records: bool = True) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "created_at": self.created_at,
             "package_version": "0.1.0",
             "scope": "i.i.d. tabular binary classification and regression",

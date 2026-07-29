@@ -36,13 +36,17 @@ Label noise and training fraction alter the training fold, refit the estimator, 
 
 ### Falsification
 
-The permutation null destroys the training target association, refits the complete estimator, and scores the paired clean audit fold. For $M$ valid null fits, StressFold reports
+The package permutation control destroys the training target association, refits the complete estimator, and scores the paired clean audit fold. For valid comparison $(b,m)$ at repeated holdout $b$ and shuffled refit $m$, define
 
 $$
-p_{+1} = \frac{1 + \sum_{m=1}^{M}\mathbb{1}(S_m \text{ matches or exceeds } S_{\mathrm{obs}})}{M + 1}.
+e_{bm}=\mathbb{1}(S^{\pi}_{bm}\text{ matches or exceeds }S_b),
+\qquad
+r_{\mathrm{pool}}=\frac{\sum_{b,m}e_{bm}}{\sum_b M_b}.
 $$
 
-“Exceeds” respects metric direction. The result tests predictive structure under label exchangeability. It is not a probability that the model is overfit, and it is only valid when the full model-selection procedure represented by the claim is repeated inside the null workflow.
+“Exceeds” respects metric direction. StressFold reports $r_{\mathrm{pool}}$ as a descriptive paired null-exceedance rate together with the number of holdouts and null fits per holdout. Repeated holdouts overlap, so this pooled rate is not a permutation p-value and must not be given a significance interpretation.
+
+A valid inferential permutation test needs one coherent dataset-level permutation for each $m$, a rerun of the complete repeated-holdout and selection workflow, and one prespecified aggregate statistic $T_m$ per permutation. The methods paper defines that broader reference protocol; the current package does not claim to implement its p-value.
 
 ## Operators
 

@@ -2,7 +2,7 @@
 
 **Generalization stress tests for tabular models.**
 
-StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train–audit gap, traces response curves under declared perturbations, and compares the complete fitting procedure with a label-permutation null.
+StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train–audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
 
 The name compresses the protocol: controlled **stress** tests repeated across train and audit splits.
 
@@ -18,7 +18,7 @@ It is an experimental instrument, not an overfitting detector and not a syntheti
 | --- | --- | --- |
 | Generalization | Does clean held-out performance deteriorate relative to training performance? | Paired train/audit scores over repeated holdouts |
 | Robustness | How does a fixed fitted model respond to a named evaluation-time perturbation? | Feature-noise and missingness response curves |
-| Falsification | Would the same fitting procedure look as successful after destroying the target association? | Label-permutation refits with a plus-one Monte Carlo p-value |
+| Falsification | Would the same fitting procedure look as successful after destroying the target association? | Label-permutation refits with a descriptive paired null-exceedance rate |
 
 Label-noise and reduced-training-set refits are reported separately as **training-stability diagnostics**. They do not turn robustness into evidence of generalization.
 
@@ -53,6 +53,8 @@ python -m pip install -e ".[dev]"
 ```
 
 Python 3.10 or newer is required.
+
+The automated validation matrix covers clear signal, independent labels, nonlinear XOR structure, linear and interaction regression, imbalance, missing values, small samples, unusable targets, duplicate patterns, target proxies, deterministic reruns, and provenance hashing. See [`docs/validation.md`](docs/validation.md) for the expected behavior and claim boundary.
 
 ## Quick start
 
@@ -126,7 +128,7 @@ An audit returns ordinary, inspectable pandas tables:
 records = result.records_frame()                 # one metric evaluation per run
 curves = result.summary_frame()                  # response summaries by operator and level
 gaps = result.generalization_summary()           # paired clean train/audit gaps
-null = result.permutation_summary()               # plus-one permutation results
+null = result.permutation_summary()               # descriptive paired null comparison
 ```
 
 The JSON artifact contains the configuration, stress suite, data fingerprint, estimator representation, named seed ledger, errors, summaries, and optionally all records. The HTML report is self-contained and has no runtime network dependency.
@@ -143,7 +145,7 @@ Each exported CSV has a manifest entry recording its source fingerprint, split, 
 
 ## Browser lab
 
-The repository includes a local browser lab for inspecting the protocol before writing model code. It accepts CSV files up to 5 MB, runs binary-classification or regression audits over numeric predictors, and offers regularized linear/logistic and nearest-neighbor reference models. Files are parsed and analyzed in the browser; the current implementation does not upload the dataset.
+The repository includes a local browser lab for inspecting the protocol before writing model code. It accepts CSV files up to 5 MB and 5,000 data rows, runs binary-classification or regression audits over numeric predictors, and offers regularized linear/logistic and nearest-neighbor reference models. Files are parsed and analyzed in the browser; the current implementation does not upload the dataset. Larger tables are rejected rather than silently sampled.
 
 ```bash
 npm ci
@@ -156,7 +158,7 @@ The lab exports a self-contained report, results JSON, and individual stress var
 
 - Repeated random holdout assumes exchangeable rows. It is not appropriate for grouped, longitudinal, spatial, or temporal dependence without a matching split policy.
 - A response curve characterizes the named operator, not every future distribution shift. Gaussian feature noise is not a substitute for a deployment model.
-- The permutation result depends on label exchangeability and the complete selection procedure being rerun. A small p-value is evidence of predictive association under that null, not proof of useful deployment performance.
+- The package permutation summary pools paired null exceedances across overlapping holdouts as a descriptive rate. It is not a p-value. Valid permutation inference requires coherent dataset-level permutations and one complete protocol statistic per permutation.
 - Reusing the audit set for model or stressor selection creates optimism. Nest selection when the result will support a decision.
 - StressFold does not establish causal validity, calibration, fairness, privacy, or the absence of overfitting. Small samples can produce wide and unstable profiles.
 
@@ -174,6 +176,7 @@ The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, 
 
 - Group-aware, blocked, and rolling-origin split policies
 - Nested selection and calibration diagnostics
+- Coherent dataset-level permutation inference for the complete repeated-holdout statistic
 - Domain-informed perturbation operators and comparison reports
 - A public benchmark suite with known failure modes
 - Conditional replica or diffusion models only after explicit fidelity, privacy, and downstream-utility gates; generated rows will remain stress instruments, never extra holdout evidence

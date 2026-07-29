@@ -1,15 +1,16 @@
 import type { AuditResult } from "./analysis";
 
 export function buildHtmlReport(result: AuditResult): string {
+  const retainedSkillReliable = result.baseline.retainedSkillReliable;
   const rows = result.summaries
     .map(
       (summary) => `
         <tr>
           <td>${escapeHtml(summary.label)}</td>
           <td>${escapeHtml(summary.mode)}</td>
-          <td>${summary.degradationArea.toFixed(3)}</td>
-          <td>${summary.firstStepLoss.toFixed(3)}</td>
-          <td>${escapeHtml(summary.halfSkillAt)}</td>
+          <td>${retainedSkillReliable ? summary.degradationArea.toFixed(3) : "not interpretable"}</td>
+          <td>${retainedSkillReliable ? summary.firstStepLoss.toFixed(3) : "not interpretable"}</td>
+          <td>${retainedSkillReliable ? escapeHtml(summary.halfSkillAt) : "not interpretable"}</td>
         </tr>`,
     )
     .join("");
@@ -52,10 +53,11 @@ export function buildHtmlReport(result: AuditResult): string {
     <div class="metric"><span>Median ${result.baseline.scoreLabel}</span><strong>${result.baseline.score.toFixed(3)}</strong><span>Clean audit folds</span></div>
     <div class="metric"><span>Train-audit loss gap</span><strong>${result.baseline.gap.toFixed(3)}</strong><span>${result.baseline.lossLabel}</span></div>
     <div class="metric"><span>Split variability</span><strong>${result.baseline.splitSpread.toFixed(3)}</strong><span>5th-95th score span</span></div>
-    <div class="metric"><span>Permutation percentile</span><strong>${result.permutation.percentile.toFixed(0)}th</strong><span>${result.permutation.runs} quick null refits</span></div>
+    <div class="metric"><span>Null midrank</span><strong>${result.permutation.percentile.toFixed(0)} / 100</strong><span>${result.permutation.runs} quick null refits; descriptive, not a p-value</span></div>
   </section>
   <h2>Interpretation</h2><section class="findings">${findings}</section>
   <h2>Stress-response summaries</h2>
+  ${retainedSkillReliable ? "" : '<p class="lede">Normalized curve rankings are withheld because the clean baseline did not reliably beat its constant reference. Inspect raw losses and model specification before comparing stressors.</p>'}
   <table><thead><tr><th>Operator</th><th>Experiment</th><th>Degradation area</th><th>First-step loss</th><th>50% skill boundary</th></tr></thead><tbody>${rows}</tbody></table>
   ${warnings}
   <footer>Source ${escapeHtml(result.protocol.sourceHash)}. Generated ${escapeHtml(result.protocol.generatedAt)} with ${escapeHtml(result.protocol.browserEngine)}. Monte Carlo intervals describe variation between runs under this protocol; they are not classical confidence intervals.</footer>

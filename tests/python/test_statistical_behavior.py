@@ -76,7 +76,10 @@ def test_permutation_null_is_near_chance_and_below_observed_signal() -> None:
 
     assert 0.35 < row["null_mean"] < 0.65
     assert row["observed_mean"] > 0.9
-    assert row["plus_one_p"] <= 0.08
+    assert row["pooled_paired_exceedance_rate"] <= 0.08
+    assert row["repeat_count"] == 3
+    assert row["null_fits_per_repeat_min"] == 8
+    assert row["null_fits_per_repeat_max"] == 8
 
 
 def test_large_heldout_feature_noise_increases_regression_error() -> None:

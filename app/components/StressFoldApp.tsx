@@ -227,6 +227,9 @@ export function StressFoldApp() {
     ? [...result.summaries].sort((left, right) => right.degradationArea - left.degradationArea)[0]
     : null;
   const headline = result && weakest ? buildResultHeadline(result, weakest.label) : "";
+  const visibleWarnings = result?.warnings.filter(
+    (warning) => !warning.startsWith("Identifier columns excluded from modeling:"),
+  ) ?? [];
 
   return (
     <div className="site-frame">
@@ -438,6 +441,13 @@ export function StressFoldApp() {
                     </p>
                   </div>
 
+                  {visibleWarnings.length > 0 && (
+                    <aside className="audit-warning-strip" aria-label="Checks required before interpretation">
+                      <strong>Check before interpreting</strong>
+                      <ul>{visibleWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                    </aside>
+                  )}
+
                   <div className="run-context" aria-label="Settings used for the visible result">
                     <span>Target <strong>{result.dataset.target}</strong></span>
                     <span>Browser model <strong>{modelName(result.protocol.model)}</strong></span>
@@ -465,7 +475,7 @@ export function StressFoldApp() {
                     <Metric
                       label="Real score versus shuffled median"
                       value={`${formatMetric(result.permutation.observed)} vs ${formatMetric(result.permutation.nullMedian)}`}
-                      note={`${result.baseline.scoreLabel}; ${result.permutation.runs} shuffled refits; corrected rank ${Math.round(result.permutation.percentile)} / 100`}
+                      note={`${result.baseline.scoreLabel}; ${result.permutation.runs} shuffled refits; tie-adjusted rank ${Math.round(result.permutation.percentile)} / 100`}
                     />
                   </div>
 
@@ -496,7 +506,7 @@ export function StressFoldApp() {
                         <tbody>
                           {result.summaries.map((summary) => (
                             <tr key={summary.id}>
-                              <td>{summary.label}</td><td>{summary.mode}</td><td>{summary.degradationArea.toFixed(3)}</td><td>{summary.firstStepLoss.toFixed(3)}</td><td>{summary.halfSkillAt}</td>
+                              <td>{summary.label}</td><td>{summary.mode}</td><td>{result.baseline.retainedSkillReliable ? summary.degradationArea.toFixed(3) : "not interpretable"}</td><td>{result.baseline.retainedSkillReliable ? summary.firstStepLoss.toFixed(3) : "not interpretable"}</td><td>{result.baseline.retainedSkillReliable ? summary.halfSkillAt : "not interpretable"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -569,10 +579,10 @@ export function StressFoldApp() {
           <div className="paper-copy">
             <div className="eyebrow">Technical note</div>
             <h2>Perturbation-response profiling for tabular model generalization</h2>
-            <p>The paper defines the split protocol, four stress operators, repeated-run summaries, shuffled-label control, assumptions, and claim boundaries. The LaTeX source is included.</p>
+            <p>The paper defines the broader reference protocol and its claim boundaries. The browser lab implements a narrower four-stressor subset; the Mathematics section above gives its exact formulas.</p>
             <div className="paper-actions">
-              <a className="button button-primary" href="/paper/stressfold.pdf" target="_blank" rel="noreferrer">Read the paper</a>
-              <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">Read the LaTeX</a>
+              <a className="button button-primary" href="/paper/stressfold.pdf" target="_blank" rel="noreferrer">Open PDF preview</a>
+              <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">LaTeX source (.tex)</a>
             </div>
           </div>
           <div className="citation-block">
@@ -605,6 +615,15 @@ function modelName(model: ModelKind) {
 }
 
 function buildResultHeadline(result: AuditResult, weakestLabel: string) {
+  const leakageWarning = result.warnings.some((warning) =>
+    warning.includes("Random row splits can place the same entity") || warning.includes("nearly determines the target"),
+  );
+  if (leakageWarning) {
+    return `${result.baseline.scoreLabel} on unseen rows is ${formatMetric(result.baseline.score)}, but possible split leakage must be checked before interpreting it.`;
+  }
+  if (!result.baseline.retainedSkillReliable) {
+    return `${result.baseline.scoreLabel} on unseen rows is ${formatMetric(result.baseline.score)}. The baseline does not reliably beat a constant predictor, so the normalized stress ranking is withheld.`;
+  }
   return `${result.baseline.scoreLabel} on unseen rows is ${formatMetric(result.baseline.score)}. Across the four tested grids, ${weakestLabel.toLowerCase()} causes the largest overall decline.`;
 }
 
@@ -616,11 +635,13 @@ function plainFindingLabel(kind: AuditFinding["kind"]) {
 
 function plainFindingDetail(finding: AuditFinding, result: AuditResult) {
   if (finding.kind === "generalization") {
+    if (finding.title === "Check possible split leakage first") return finding.detail;
     return `Within each repeat, unseen loss minus training loss was computed. The median paired gap was ${formatMetric(result.baseline.gap)}. For context, the separate medians were ${formatMetric(result.baseline.trainLoss)} for training and ${formatMetric(result.baseline.auditLoss)} for unseen rows.`;
   }
   if (finding.kind === "robustness") {
+    if (!result.baseline.retainedSkillReliable) return finding.detail;
     const weakest = [...result.summaries].sort((left, right) => right.degradationArea - left.degradationArea)[0];
     return `${weakest.label} has the largest normalized trapezoid area on its tested grid. Open the curve above to inspect the actual severities. This does not claim that unlike stress levels are equally realistic.`;
   }
-  return `The real score has a corrected null rank of ${Math.round(result.permutation.percentile)} on a 0 to 100 scale. The plus one correction means this is not literally the percentage of shuffled runs beaten and it is not a p-value.`;
+  return `The real score has a tie-adjusted null rank of ${Math.round(result.permutation.percentile)} on a 0 to 100 scale. Lower null scores count fully, exact ties count one half, and this is not a p-value.`;
 }

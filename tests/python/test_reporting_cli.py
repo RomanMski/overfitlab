@@ -30,9 +30,12 @@ def test_json_and_html_reports_are_self_contained(
 
     assert "StressFold" in html
     assert "Monte Carlo variability intervals" in html
+    assert "not a permutation p-value" in html
+    assert "Paired exceedance rate" in html
+    assert "Paired +1 p" not in html
     assert "<svg" in html
     assert "https://" not in html
-    assert payload["schema_version"] == "1.0"
+    assert payload["schema_version"] == "1.1"
     assert payload["data"]["fingerprint"] == result.data_fingerprint
     assert payload["interpretation"].startswith("StressFold estimates")
 

@@ -41,6 +41,8 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/output/
+/tmp/
 
 # Python and test caches
 __pycache__/

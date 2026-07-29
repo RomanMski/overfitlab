@@ -6,10 +6,15 @@ export function parseCsv(text: string, name = "dataset.csv"): DataTable {
   const headers = matrix[0].map((value, index) => value.trim() || `column_${index + 1}`);
   const duplicates = headers.filter((header, index) => headers.indexOf(header) !== index);
   if (duplicates.length) throw new Error(`Duplicate column name: ${duplicates[0]}`);
-  const rows = matrix
+  const dataRows = matrix
     .slice(1)
-    .filter((values) => values.some((value) => value.trim() !== ""))
-    .slice(0, 5000)
+    .filter((values) => values.some((value) => value.trim() !== ""));
+  if (dataRows.length > 5000) {
+    throw new Error(
+      `This browser lab accepts at most 5,000 data rows; found ${dataRows.length.toLocaleString("en-US")}. Use the Python package so no rows are omitted.`,
+    );
+  }
+  const rows = dataRows
     .map((values) =>
       Object.fromEntries(
         headers.map((header, index) => [header, coerce(values[index] ?? "")]),

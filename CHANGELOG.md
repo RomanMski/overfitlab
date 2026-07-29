@@ -4,6 +4,18 @@ All notable changes to StressFold will be documented here. The format follows [K
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the pooled repeat-by-permutation `plus_one_p` field with a descriptive paired null-exceedance rate; overlapping holdouts are no longer presented as independent permutation evidence
+- Added tie-adjusted browser null ranks, minimum class-count and non-constant-target checks, and full-dataset provenance hashing
+- Bumped the exported JSON schema to `1.1` for the corrected permutation-summary fields
+
+### Fixed
+
+- Withhold normalized stressor rankings when the clean baseline does not reliably outperform its constant reference
+- Block interpretation for repeated entity identifiers and near-perfect target proxies, while keeping repeated predictor patterns as a neutral review note
+- Reject browser uploads above 5,000 rows instead of silently analyzing only the first 5,000
+
 ### Planned
 
 - Broader split policies and domain-informed stress operators

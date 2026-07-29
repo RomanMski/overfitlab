@@ -49,7 +49,7 @@ test("sample audit is deterministic and returns all evidence families", async ()
   assert.equal(first.baseline.score, second.baseline.score);
   assert.deepEqual(first.curves, second.curves);
   assert.equal(first.curves.length, 4);
-  assert.equal(first.protocol.browserEngine, "StressFold browser protocol 0.2");
+  assert.equal(first.protocol.browserEngine, "StressFold browser protocol 0.3");
   for (const curve of first.curves) {
     assert.equal(curve.points[0].level, 0);
     assert.equal(curve.points[0].median, 1);
@@ -126,4 +126,12 @@ test("CSV parser round-trips quoted values and missing cells", () => {
   assert.equal(parsed.rows[1].value, null);
   const reparsed = parseCsv(tableToCsv(parsed), "quoted-again.csv");
   assert.deepEqual(reparsed.rows, parsed.rows);
+});
+
+test("CSV parser rejects oversized tables instead of silently truncating them", () => {
+  const rows = Array.from({ length: 5_001 }, (_, index) => `${index},${index % 2}`).join("\n");
+  assert.throws(
+    () => parseCsv(`feature,target\n${rows}\n`, "oversized.csv"),
+    /at most 5,000 data rows; found 5,001/,
+  );
 });

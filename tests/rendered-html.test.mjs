@@ -33,6 +33,9 @@ test("server-renders the StressFold tool before its method reference", async () 
   assert.match(html, /Browser scores/);
   assert.match(html, /Training loss versus unseen loss/);
   assert.match(html, /Test a baseline on my CSV/);
+  assert.match(html, /browser lab implements a narrower four-stressor subset/i);
+  assert.match(html, /Open PDF preview/);
+  assert.match(html, /LaTeX source \(\.tex\)/);
   assert.match(html, />Limit</);
   assert.ok(
     html.indexOf("Run a generalization and robustness audit") <
