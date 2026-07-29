@@ -7,6 +7,7 @@ import {
   inferTask,
   makeSampleDataset,
   runAudit,
+  type AuditFinding,
   type AuditResult,
   type AuditSettings,
   type DataTable,
@@ -15,6 +16,7 @@ import {
 } from "../lib/analysis";
 import { downloadText, parseCsv, tableToCsv } from "../lib/csv";
 import { buildHtmlReport } from "../lib/report";
+import { ConceptExplainers } from "./ConceptExplainers";
 import { StressChart } from "./StressChart";
 
 const SAMPLE_TABLE = makeSampleDataset();
@@ -37,8 +39,58 @@ const VARIANT_LEVELS: Record<VariantFamily, number[]> = {
   bootstrap: [1],
 };
 
+interface TargetInfo {
+  valid: boolean;
+  task: TaskType;
+  description: string;
+}
+
+function describeTarget(table: DataTable, header: string): TargetInfo {
+  const values = table.rows
+    .map((row) => row[header])
+    .filter((value): value is string | number => value !== null && value !== "");
+  const unique = new Set(values.map(String));
+  const numericShare = values.length
+    ? values.filter((value) => Number.isFinite(Number(value))).length / values.length
+    : 0;
+  const looksLikeIdentifier =
+    /(^|_)(id|uuid|key|index)($|_)/i.test(header) && unique.size / Math.max(values.length, 1) > 0.9;
+
+  if (values.length < 40) {
+    return { valid: false, task: "regression", description: "too few filled rows" };
+  }
+  if (unique.size < 2) {
+    return { valid: false, task: "regression", description: "only one value" };
+  }
+  if (looksLikeIdentifier) {
+    return { valid: false, task: "regression", description: "looks like an identifier" };
+  }
+  if (unique.size === 2) {
+    return { valid: true, task: "classification", description: "two possible outcomes" };
+  }
+  if (numericShare >= 0.95) {
+    return { valid: true, task: "regression", description: "number to predict" };
+  }
+  return {
+    valid: false,
+    task: "classification",
+    description: "browser demo needs two classes or a number",
+  };
+}
+
+function chooseSupportedTarget(table: DataTable) {
+  const preferred = inferTarget(table);
+  if (preferred && describeTarget(table, preferred).valid) return preferred;
+  return [...table.headers].reverse().find((header) => describeTarget(table, header).valid) ?? "";
+}
+
+function makeRunKey(tableVersion: number, settings: AuditSettings) {
+  return JSON.stringify([tableVersion, ...Object.values(settings)]);
+}
+
 export function StressFoldApp() {
   const [table, setTable] = useState<DataTable>(SAMPLE_TABLE);
+  const [tableVersion, setTableVersion] = useState(0);
   const [target, setTarget] = useState(DEFAULT_SETTINGS.target);
   const [task, setTask] = useState<TaskType>(DEFAULT_SETTINGS.task);
   const [model, setModel] = useState<ModelKind>(DEFAULT_SETTINGS.model);
@@ -46,57 +98,86 @@ export function StressFoldApp() {
   const [testSize, setTestSize] = useState(DEFAULT_SETTINGS.testSize);
   const [seed, setSeed] = useState(DEFAULT_SETTINGS.seed);
   const [result, setResult] = useState<AuditResult | null>(null);
+  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [progressLabel, setProgressLabel] = useState("Preparing protocol");
+  const [progressLabel, setProgressLabel] = useState("Preparing the worked example");
   const [error, setError] = useState<string | null>(null);
   const [variantFamily, setVariantFamily] = useState<VariantFamily>("feature-noise");
   const [variantLevel, setVariantLevel] = useState(0.25);
   const initialRunStarted = useRef(false);
+  const latestRun = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const settings = useMemo<AuditSettings>(
     () => ({ target, task, model, repeats, testSize, seed }),
     [target, task, model, repeats, testSize, seed],
   );
+  const currentRunKey = useMemo(
+    () => makeRunKey(tableVersion, settings),
+    [tableVersion, settings],
+  );
+  const changesNotApplied = Boolean(result && lastRunKey !== currentRunKey);
+  const targetOptions = useMemo(
+    () => table.headers.map((header) => ({ header, ...describeTarget(table, header) })),
+    [table],
+  );
+  const previewHeaders = useMemo(() => {
+    const first = table.headers.filter((header) => header !== target).slice(0, 3);
+    return [...first, target].filter(Boolean);
+  }, [table, target]);
 
   useEffect(() => {
     if (initialRunStarted.current) return;
     initialRunStarted.current = true;
-    void executeAudit(SAMPLE_TABLE, DEFAULT_SETTINGS);
-    // The first run deliberately uses the locked sample protocol once.
+    void executeAudit(SAMPLE_TABLE, DEFAULT_SETTINGS, makeRunKey(0, DEFAULT_SETTINGS));
+    // This is the one automatic run: a complete example should be visible without setup.
   }, []);
 
-  async function executeAudit(data: DataTable, auditSettings: AuditSettings) {
+  async function executeAudit(data: DataTable, auditSettings: AuditSettings, auditKey: string) {
+    const runNumber = latestRun.current + 1;
+    latestRun.current = runNumber;
     setRunning(true);
     setProgress(0);
+    setProgressLabel("Preparing repeated unseen-data tests");
     setError(null);
     try {
       const nextResult = await runAudit(data, auditSettings, (fraction, label) => {
+        if (latestRun.current !== runNumber) return;
         setProgress(fraction);
-        setProgressLabel(label);
+        setProgressLabel(label.replace("Repeated split", "Unseen-data repeat"));
       });
+      if (latestRun.current !== runNumber) return;
       setResult(nextResult);
+      setLastRunKey(auditKey);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The audit could not be completed.");
+      if (latestRun.current !== runNumber) return;
+      setError(caught instanceof Error ? caught.message : "The test could not be completed.");
     } finally {
-      setRunning(false);
-      setProgress(1);
+      if (latestRun.current === runNumber) {
+        setRunning(false);
+        setProgress(1);
+      }
     }
   }
 
   async function handleFile(file: File) {
     if (file.size > 5 * 1024 * 1024) {
-      setError("Keep browser-lab CSV files below 5 MB. The Python package handles larger audits.");
+      setError("This browser demo accepts CSV files up to 5 MB. Use the Python package for larger data.");
       return;
     }
     try {
       const parsed = parseCsv(await file.text(), file.name);
-      const nextTarget = inferTarget(parsed);
+      const nextTarget = chooseSupportedTarget(parsed);
+      if (!nextTarget) {
+        throw new Error(
+          "Choose a CSV with at least one usable outcome: either two categories or a numeric column with 40 filled rows.",
+        );
+      }
       setTable(parsed);
+      setTableVersion((version) => version + 1);
       setTarget(nextTarget);
-      setTask(inferTask(parsed, nextTarget));
-      setResult(null);
+      setTask(describeTarget(parsed, nextTarget).task);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The CSV could not be read.");
@@ -104,7 +185,9 @@ export function StressFoldApp() {
   }
 
   function restoreSample() {
+    const nextVersion = tableVersion + 1;
     setTable(SAMPLE_TABLE);
+    setTableVersion(nextVersion);
     setTarget(DEFAULT_SETTINGS.target);
     setTask(DEFAULT_SETTINGS.task);
     setModel(DEFAULT_SETTINGS.model);
@@ -112,12 +195,15 @@ export function StressFoldApp() {
     setTestSize(DEFAULT_SETTINGS.testSize);
     setSeed(DEFAULT_SETTINGS.seed);
     setError(null);
-    void executeAudit(SAMPLE_TABLE, DEFAULT_SETTINGS);
+    void executeAudit(
+      SAMPLE_TABLE,
+      DEFAULT_SETTINGS,
+      makeRunKey(nextVersion, DEFAULT_SETTINGS),
+    );
   }
 
-  function applyPreset(preset: "quick" | "audit") {
+  function applyPreset(preset: "quick" | "careful") {
     setRepeats(preset === "quick" ? 8 : 24);
-    setModel(preset === "quick" ? "regularized" : model);
   }
 
   function handleFamilyChange(family: VariantFamily) {
@@ -135,7 +221,11 @@ export function StressFoldApp() {
     }
   }
 
-  const resultHash = result?.protocol.sourceHash.replace("fnv1a-", "") ?? "pending";
+  const resultHash = result?.protocol.sourceHash.replace("fnv1a-", "") ?? "working";
+  const weakest = result
+    ? [...result.summaries].sort((left, right) => right.degradationArea - left.degradationArea)[0]
+    : null;
+  const headline = result && weakest ? buildResultHeadline(result, weakest.label) : "";
 
   return (
     <div className="site-frame">
@@ -145,272 +235,312 @@ export function StressFoldApp() {
           <span>StressFold</span>
         </a>
         <nav className="primary-nav" aria-label="Primary navigation">
-          <a href="#lab">Browser lab</a>
-          <a href="#method">Method</a>
+          <a href="#learn">Learn the tests</a>
+          <a href="#lab">Try the demo</a>
           <a href="#paper">Paper</a>
         </nav>
-        <div className="header-status"><span /> v0.1 research preview</div>
+        <div className="header-status"><span /> v0.2 research preview</div>
       </header>
 
       <main id="top">
         <section className="hero section-boundary">
           <div className="hero-copy">
-            <div className="kicker"><span>Generalization stress testing</span><span>Tabular models</span></div>
-            <h1>Find where a model<br />stops generalizing.</h1>
+            <div className="kicker"><span>Overfitting stress tests</span><span>Tabular models</span></div>
+            <h1>Does your model still work when the data gets slightly worse?</h1>
             <p className="hero-lede">
-              StressFold traces model performance across controlled perturbations, repeated refits, and label-permutation nulls. Every split, seed, and generated variant is recorded.
+              Give a model an unseen-data exam, damage the data in controlled ways, and repeat the experiment so one lucky split cannot decide the result.
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="#lab">Open browser lab <span aria-hidden="true">→</span></a>
-              <a className="button button-quiet" href="#method">Read the protocol</a>
+              <a className="button button-primary" href="#lab">Run the worked example <span aria-hidden="true">→</span></a>
+              <a className="button button-quiet" href="#learn">Learn the five tests</a>
             </div>
             <div className="trust-row" aria-label="Product properties">
-              <span>Runs in your browser</span>
-              <span>Paired Monte Carlo</span>
-              <span>Reproducible exports</span>
+              <span>Runs locally</span>
+              <span>Every run is repeatable</span>
+              <span>No black-box verdict</span>
             </div>
           </div>
-          <div className="protocol-figure" aria-label="StressFold protocol from observed data to an evidence profile">
-            <div className="figure-label">Protocol / 0.1</div>
+          <div className="protocol-figure" aria-label="A four-step model stress test">
+            <div className="figure-label">A fair model exam</div>
             <div className="protocol-nodes">
-              <div className="protocol-node active"><b>01</b><span>Split</span><small>Repeated holdout</small></div>
+              <div className="protocol-node active"><b>01</b><span>Hide rows</span><small>Save an unseen exam</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
-              <div className="protocol-node"><b>02</b><span>Fit</span><small>Train-fold only</small></div>
+              <div className="protocol-node"><b>02</b><span>Fit</span><small>Use training rows only</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
-              <div className="protocol-node"><b>03</b><span>Stress</span><small>Perturb or refit</small></div>
+              <div className="protocol-node"><b>03</b><span>Stress</span><small>Add controlled damage</small></div>
               <div className="protocol-link"><i /><i /><i /></div>
-              <div className="protocol-node"><b>04</b><span>Compare</span><small>Paired loss</small></div>
+              <div className="protocol-node"><b>04</b><span>Repeat</span><small>Change the split</small></div>
             </div>
             <div className="figure-output">
-              <div>
-                <span>Evidence profile</span>
-                <strong>G · R(λ) · P<sub>null</sub></strong>
-              </div>
+              <div><span>The useful answer</span><strong>Where does performance fail?</strong></div>
               <div className="mini-bars" aria-hidden="true">
-                <i style={{ height: "86%" }} /><i style={{ height: "70%" }} /><i style={{ height: "44%" }} /><i style={{ height: "22%" }} />
+                <i style={{ height: "86%" }} /><i style={{ height: "74%" }} /><i style={{ height: "48%" }} /><i style={{ height: "25%" }} />
               </div>
             </div>
-            <p>One instrument, three distinct claims: generalization, robustness, and falsification.</p>
+            <p>StressFold reports evidence about this test—not a magical “overfit / not overfit” stamp.</p>
           </div>
         </section>
 
-        <section className="definition-strip" aria-label="What StressFold measures">
-          <div><b>G</b><span>Train-audit gap</span><small>Generalization</small></div>
-          <div><b>R(λ)</b><span>Retained skill curve</span><small>Robustness</small></div>
-          <div><b>V</b><span>Across-split spread</span><small>Instability</small></div>
-          <div><b>P<sub>null</sub></b><span>Permutation percentile</span><small>Falsification</small></div>
+        <section className="definition-strip" aria-label="The four questions in a StressFold audit">
+          <div><b>01</b><span>New rows</span><small>Does practice transfer?</small></div>
+          <div><b>02</b><span>Damaged inputs</span><small>What breaks first?</small></div>
+          <div><b>03</b><span>Repeated splits</span><small>Was one result lucky?</small></div>
+          <div><b>04</b><span>Shuffled answers</span><small>Does nonsense still score?</small></div>
         </section>
+
+        <ConceptExplainers />
 
         <section className="lab-section" id="lab">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">Local browser instrument</div>
-              <h2>Run a bounded audit before writing model code.</h2>
+              <div className="eyebrow">A complete worked example</div>
+              <h2>Try the test, then inspect every number.</h2>
             </div>
-            <p>Upload a CSV or use the reproducible sample. Files stay on this device; the browser lab supports binary classification and regression over numeric predictors.</p>
+            <p>
+              The browser fits a clearly labelled demo model to a CSV. To audit your exact production pipeline, use the Python API with your own scikit-learn compatible model.
+            </p>
           </div>
 
           <div className="lab-workspace">
-            <aside className="control-panel" aria-label="Audit setup">
+            <aside className="control-panel" id="audit-controls" aria-label="Test setup">
               <div className="panel-heading">
-                <div><span>Setup</span><strong>Audit protocol</strong></div>
-                <span className="step-counter">01 / 03</span>
+                <div><span>Three choices</span><strong>Set up the demo</strong></div>
+                <span className="step-counter">Local only</span>
               </div>
 
-              <div className="dataset-card">
-                <div className="file-glyph" aria-hidden="true"><span>CSV</span></div>
-                <div className="dataset-meta">
-                  <strong title={table.name}>{table.name}</strong>
-                  <span>{table.rows.length.toLocaleString()} rows · {table.headers.length} columns</span>
+              <fieldset className="setup-fields" disabled={running}>
+                <legend className="visually-hidden">Dataset and model settings</legend>
+                <div className="dataset-card">
+                  <div className="file-glyph" aria-hidden="true"><span>CSV</span></div>
+                  <div className="dataset-meta">
+                    <strong title={table.name}>{table.name}</strong>
+                    <span>{table.rows.length.toLocaleString()} rows · {table.headers.length} columns</span>
+                  </div>
+                  <button className="icon-button" type="button" onClick={() => fileInputRef.current?.click()} aria-label="Choose another CSV">↗</button>
+                  <input
+                    ref={fileInputRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleFile(file);
+                      event.currentTarget.value = "";
+                    }}
+                  />
                 </div>
-                <button className="icon-button" type="button" onClick={() => fileInputRef.current?.click()} aria-label="Choose another CSV">↗</button>
-                <input
-                  ref={fileInputRef}
-                  className="visually-hidden"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleFile(file);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </div>
-              <div className="dataset-actions">
-                <button type="button" onClick={() => fileInputRef.current?.click()}>Upload CSV</button>
-                <button type="button" onClick={restoreSample}>Restore sample</button>
-              </div>
-
-              <div className="control-group">
-                <label htmlFor="target-column">Target column</label>
-                <select
-                  id="target-column"
-                  value={target}
-                  onChange={(event) => {
-                    setTarget(event.target.value);
-                    setTask(inferTask(table, event.target.value));
-                    setResult(null);
-                  }}
-                >
-                  {table.headers.map((header) => <option key={header} value={header}>{header}</option>)}
-                </select>
-              </div>
-
-              <fieldset className="control-group">
-                <legend>Task</legend>
-                <div className="segmented-control">
-                  <button className={task === "classification" ? "selected" : ""} type="button" onClick={() => setTask("classification")}>Binary</button>
-                  <button className={task === "regression" ? "selected" : ""} type="button" onClick={() => setTask("regression")}>Regression</button>
+                <div className="dataset-actions">
+                  <button type="button" onClick={() => fileInputRef.current?.click()}>Use my CSV</button>
+                  <button type="button" onClick={restoreSample}>Restore example</button>
                 </div>
-              </fieldset>
 
-              <div className="control-group">
-                <label htmlFor="model-kind">Estimator</label>
-                <select id="model-kind" value={model} onChange={(event) => setModel(event.target.value as ModelKind)}>
-                  <option value="regularized">Regularized linear / logistic</option>
-                  <option value="nearest-neighbor">High-capacity nearest neighbor</option>
-                </select>
-                <small>The Python API accepts any scikit-learn compatible pipeline.</small>
-              </div>
+                <details className="dataset-preview">
+                  <summary>Preview the first five rows</summary>
+                  <div className="dataset-preview__scroll">
+                    <table>
+                      <thead><tr>{previewHeaders.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+                      <tbody>
+                        {table.rows.slice(0, 5).map((row, index) => (
+                          <tr key={index}>{previewHeaders.map((header) => <td key={header}>{String(row[header] ?? "—")}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
 
-              <div className="preset-row" aria-label="Run preset">
-                <button type="button" onClick={() => applyPreset("quick")}>Quick · 8</button>
-                <button type="button" onClick={() => applyPreset("audit")}>Audit · 24</button>
-              </div>
-
-              <div className="inline-controls">
-                <div className="control-group compact">
-                  <label htmlFor="repeat-count">Repeats</label>
-                  <input id="repeat-count" type="number" min="4" max="40" step="1" value={repeats} onChange={(event) => setRepeats(Number(event.target.value))} />
-                </div>
-                <div className="control-group compact">
-                  <label htmlFor="test-size">Audit share</label>
-                  <select id="test-size" value={testSize} onChange={(event) => setTestSize(Number(event.target.value))}>
-                    <option value="0.2">20%</option><option value="0.25">25%</option><option value="0.3">30%</option><option value="0.35">35%</option>
+                <div className="control-group">
+                  <label htmlFor="target-column">What should the demo predict?</label>
+                  <select
+                    id="target-column"
+                    value={target}
+                    onChange={(event) => {
+                      const nextTarget = event.target.value;
+                      setTarget(nextTarget);
+                      setTask(describeTarget(table, nextTarget).task);
+                    }}
+                  >
+                    {targetOptions.map((option) => (
+                      <option key={option.header} value={option.header} disabled={!option.valid}>
+                        {option.header} — {option.description}
+                      </option>
+                    ))}
                   </select>
+                  <small>
+                    Detected automatically: {task === "classification" ? "a two-outcome prediction" : "a number prediction"}.
+                  </small>
                 </div>
-                <div className="control-group compact">
-                  <label htmlFor="seed">Seed</label>
-                  <input id="seed" type="number" value={seed} onChange={(event) => setSeed(Number(event.target.value))} />
-                </div>
-              </div>
 
-              <div className="operator-list" aria-label="Enabled stress operators">
-                <div><span className="operator-dot teal" /><b>Feature noise</b><small>fixed model</small></div>
-                <div><span className="operator-dot amber" /><b>Label noise</b><small>refit</small></div>
-                <div><span className="operator-dot violet" /><b>Missingness</b><small>fixed model</small></div>
-                <div><span className="operator-dot gold" /><b>Train size</b><small>refit</small></div>
-              </div>
+                <div className="control-group">
+                  <label htmlFor="model-kind">Which demo model?</label>
+                  <select id="model-kind" value={model} onChange={(event) => setModel(event.target.value as ModelKind)}>
+                    <option value="regularized">Steady baseline · regularized linear model</option>
+                    <option value="nearest-neighbor">Flexible baseline · nearest neighbors</option>
+                  </select>
+                  <small>This choice tests a built-in baseline, not a model already running elsewhere.</small>
+                </div>
+
+                <div className="preset-row" aria-label="Repeat preset">
+                  <button type="button" onClick={() => applyPreset("quick")}>Quick · 8 repeats</button>
+                  <button type="button" onClick={() => applyPreset("careful")}>Careful · 24 repeats</button>
+                </div>
+
+                <details className="advanced-controls">
+                  <summary>Advanced repeat settings</summary>
+                  <div className="inline-controls">
+                    <div className="control-group compact">
+                      <label htmlFor="repeat-count">Repeats</label>
+                      <input id="repeat-count" type="number" min="4" max="40" step="1" value={repeats} onChange={(event) => setRepeats(Number(event.target.value))} />
+                    </div>
+                    <div className="control-group compact">
+                      <label htmlFor="test-size">Rows kept unseen</label>
+                      <select id="test-size" value={testSize} onChange={(event) => setTestSize(Number(event.target.value))}>
+                        <option value="0.2">20%</option><option value="0.25">25%</option><option value="0.3">30%</option><option value="0.35">35%</option>
+                      </select>
+                    </div>
+                    <div className="control-group compact">
+                      <label htmlFor="seed">Random seed</label>
+                      <input id="seed" type="number" value={seed} onChange={(event) => setSeed(Number(event.target.value))} />
+                    </div>
+                  </div>
+                </details>
+              </fieldset>
 
               <button
                 className="run-button"
                 type="button"
                 disabled={running}
-                onClick={() => void executeAudit(table, settings)}
+                onClick={() => void executeAudit(table, settings, currentRunKey)}
               >
-                <span>{running ? "Running paired splits" : "Run stress audit"}</span>
+                <span>{running ? "Repeating the unseen-data exam" : changesNotApplied ? "Run updated test" : result ? "Run this test again" : "Build the worked example"}</span>
                 <b aria-hidden="true">{running ? `${Math.round(progress * 100)}%` : "→"}</b>
               </button>
               {running && <div className="progress-block" role="status"><i style={{ width: `${progress * 100}%` }} /><span>{progressLabel}</span></div>}
-              {error && <div className="error-message" role="alert">{error}</div>}
-              <p className="privacy-note"><span aria-hidden="true">◇</span> Local computation. No dataset leaves the browser.</p>
+              {error && <div className="error-message" role="alert"><strong>We could not run that setup.</strong><br />{error}</div>}
+              <p className="privacy-note"><span aria-hidden="true">◇</span> The CSV never leaves this browser.</p>
             </aside>
 
             <section className="result-panel" aria-live="polite" aria-busy={running}>
+              {result && changesNotApplied && (
+                <div className="changes-banner" role="status">
+                  <div><strong>{running ? "Running your updated choices" : "Changes not applied yet"}</strong><span>The visible result still describes {result.dataset.target} in {result.dataset.name}.</span></div>
+                  {!running && <button type="button" onClick={() => void executeAudit(table, settings, currentRunKey)}>Run updated test</button>}
+                </div>
+              )}
+
               <div className="result-toolbar">
                 <div>
-                  <span className="result-state"><i className={result ? "ready" : ""} /> {result ? "Protocol complete" : running ? "Protocol running" : "Awaiting audit"}</span>
-                  <strong>{result ? `${result.dataset.rows.toLocaleString()} rows / ${result.dataset.features.length} features` : "Run the sample or upload data"}</strong>
+                  <span className="result-state"><i className={result ? "ready" : ""} /> {result ? "Worked result" : running ? "Building the example" : "Example queued"}</span>
+                  <strong>{result ? `${result.dataset.rows.toLocaleString()} usable rows · predicting ${result.dataset.target}` : "Preparing a complete churn-model audit"}</strong>
                 </div>
                 <div className="hash-label">RUN / {resultHash.toUpperCase()}</div>
               </div>
 
               {result ? (
                 <>
+                  <div className="result-answer">
+                    <span>Plain-English read</span>
+                    <h3>{headline}</h3>
+                    <p>
+                      The model was fitted without seeing the exam rows. Every stress below changes one thing at a time, then compares the result with the same clean split.
+                    </p>
+                  </div>
+
+                  <div className="run-context" aria-label="Settings used for the visible result">
+                    <span>Target <strong>{result.dataset.target}</strong></span>
+                    <span>Demo model <strong>{modelName(result.protocol.model)}</strong></span>
+                    <span>Repeats <strong>{result.protocol.repeats}</strong></span>
+                    <span>Unseen rows <strong>{Math.round(result.protocol.testSize * 100)}%</strong></span>
+                    <span>Seed <strong>{result.protocol.seed}</strong></span>
+                  </div>
+
                   <div className="metric-grid">
-                    <Metric label={`Median ${result.baseline.scoreLabel}`} value={formatMetric(result.baseline.score)} note="clean audit splits" />
-                    <Metric label="Train-audit gap" value={formatMetric(result.baseline.gap)} note={result.baseline.lossLabel.toLowerCase()} />
-                    <Metric label="Split variability" value={formatMetric(result.baseline.splitSpread)} note="5th-95th span" />
-                    <Metric label="Permutation null" value={`${Math.round(result.permutation.percentile)}th`} note={`${result.permutation.runs} quick refits`} />
+                    <Metric
+                      label="Performance on unseen rows"
+                      value={formatMetric(result.baseline.score)}
+                      note={result.baseline.scoreLabel === "AUROC" ? "AUROC: 1 is perfect; 0.5 is chance" : "R²: 1 is perfect; 0 matches predicting the average"}
+                    />
+                    <Metric
+                      label="Extra error on unseen rows"
+                      value={formatMetric(result.baseline.gap)}
+                      note={`${result.baseline.lossLabel}: unseen loss minus training loss`}
+                    />
+                    <Metric
+                      label="Dependence on the split"
+                      value={formatMetric(result.baseline.splitSpread)}
+                      note="middle 90% spread; smaller is steadier"
+                    />
+                    <Metric
+                      label="Real labels versus shuffled"
+                      value={`${Math.round(result.permutation.percentile)} / 100`}
+                      note="higher means the real relationship wins"
+                    />
                   </div>
 
                   <div className="result-section chart-section">
                     <div className="result-section-heading">
-                      <div><span>Stress response</span><h3>Retained predictive skill</h3></div>
-                      <div className="method-chip">median + 90% MC band</div>
+                      <div><span>Controlled damage</span><h3>How each stress changes predictive skill</h3></div>
+                      <div className="method-chip">median + middle 90% of repeats</div>
                     </div>
                     <StressChart curves={result.curves} />
                   </div>
 
-                  <div className="result-section">
-                    <div className="result-section-heading">
-                      <div><span>Operator summary</span><h3>Failure boundaries</h3></div>
-                      <div className="method-chip">paired by split</div>
-                    </div>
+                  <div className="finding-grid" aria-label="Three audit conclusions">
+                    {result.findings.map((finding) => (
+                      <article className={`finding-card ${finding.status}`} key={finding.kind}>
+                        <div><span>{plainFindingLabel(finding.kind)}</span><i /></div>
+                        <h3>{finding.title}</h3>
+                        <p>{plainFindingDetail(finding, result)}</p>
+                      </article>
+                    ))}
+                  </div>
+
+                  <details className="advanced-results">
+                    <summary>Advanced boundaries and protocol notes</summary>
+                    <p>These summaries are useful for comparing runs. They are not combined into one made-up “robustness score.”</p>
                     <div className="summary-table-wrap">
                       <table className="summary-table">
-                        <thead><tr><th>Operator</th><th>Experiment</th><th>Degradation area</th><th>First-step loss</th><th>50% skill boundary</th></tr></thead>
+                        <thead><tr><th>Stress test</th><th>What changes</th><th>Average curve loss</th><th>First-step loss</th><th>Half-skill point</th></tr></thead>
                         <tbody>
                           {result.summaries.map((summary) => (
                             <tr key={summary.id}>
-                              <td><span className={`operator-dot ${operatorColor(summary.id)}`} />{summary.label}</td>
-                              <td>{summary.mode}</td>
-                              <td>{summary.degradationArea.toFixed(3)}</td>
-                              <td>{summary.firstStepLoss.toFixed(3)}</td>
-                              <td>{summary.halfSkillAt}</td>
+                              <td>{summary.label}</td><td>{summary.mode}</td><td>{summary.degradationArea.toFixed(3)}</td><td>{summary.firstStepLoss.toFixed(3)}</td><td>{summary.halfSkillAt}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-
-                  <div className="finding-grid">
-                    {result.findings.map((finding) => (
-                      <article className={`finding-card ${finding.status}`} key={finding.kind}>
-                        <div><span>{finding.eyebrow}</span><i /></div>
-                        <h3>{finding.title}</h3>
-                        <p>{finding.detail}</p>
-                      </article>
-                    ))}
-                  </div>
-
-                  {result.warnings.length > 0 && (
-                    <details className="run-notes">
-                      <summary>{result.warnings.length} protocol note{result.warnings.length === 1 ? "" : "s"}</summary>
-                      <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-                    </details>
-                  )}
+                    {result.warnings.length > 0 && <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
+                  </details>
 
                   <div className="export-panel">
                     <div className="export-heading">
-                      <div><span>Reproducible artifact</span><h3>Generate a stress dataset</h3></div>
-                      <p>Exports include a source fingerprint, operator, severity, and seed. They are probes, not synthetic ground truth.</p>
+                      <div><span>Repeatable test cases</span><h3>Generate a damaged copy of the data</h3></div>
+                      <p>Use the exported CSV to challenge your own model. It is a test case—not extra training data and not new real-world evidence.</p>
                     </div>
                     <div className="export-controls">
-                      <select aria-label="Variant family" value={variantFamily} onChange={(event) => handleFamilyChange(event.target.value as VariantFamily)}>
-                        <option value="feature-noise">Feature noise</option>
-                        <option value="label-noise">Label noise</option>
-                        <option value="missingness">Missingness</option>
-                        <option value="bootstrap">Empirical bootstrap</option>
+                      <select aria-label="Damage type" value={variantFamily} onChange={(event) => handleFamilyChange(event.target.value as VariantFamily)}>
+                        <option value="feature-noise">Wobble numeric measurements</option>
+                        <option value="label-noise">Corrupt some training answers</option>
+                        <option value="missingness">Remove some input cells</option>
+                        <option value="bootstrap">Resample existing rows</option>
                       </select>
-                      <select aria-label="Variant severity" value={variantLevel} disabled={variantFamily === "bootstrap"} onChange={(event) => setVariantLevel(Number(event.target.value))}>
+                      <select aria-label="Damage severity" value={variantLevel} disabled={variantFamily === "bootstrap"} onChange={(event) => setVariantLevel(Number(event.target.value))}>
                         {VARIANT_LEVELS[variantFamily].map((level) => <option key={level} value={level}>{variantFamily === "bootstrap" ? "row resample" : `${Math.round(level * 100)}% severity`}</option>)}
                       </select>
-                      <button type="button" onClick={() => downloadVariant("csv")}>Download CSV</button>
-                      <button type="button" onClick={() => downloadVariant("manifest")}>Manifest</button>
+                      <button type="button" onClick={() => downloadVariant("csv")}>Download test CSV</button>
+                      <button type="button" onClick={() => downloadVariant("manifest")}>Download recipe</button>
                     </div>
                     <div className="report-actions">
-                      <button type="button" onClick={() => downloadText(buildHtmlReport(result), `stressfold_${resultHash}.html`, "text/html;charset=utf-8")}>Self-contained HTML report</button>
-                      <button type="button" onClick={() => downloadText(JSON.stringify(result, null, 2), `stressfold_${resultHash}.json`, "application/json;charset=utf-8")}>Results JSON</button>
+                      <button type="button" onClick={() => downloadText(buildHtmlReport(result), `stressfold_${resultHash}.html`, "text/html;charset=utf-8")}>Self-contained report</button>
+                      <button type="button" onClick={() => downloadText(JSON.stringify(result, null, 2), `stressfold_${resultHash}.json`, "application/json;charset=utf-8")}>Raw result data</button>
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="empty-result">
                   <div className="empty-orbit" aria-hidden="true"><i /><i /><i /></div>
-                  <h3>{running ? "Estimating response curves" : "No audit result yet"}</h3>
-                  <p>{running ? progressLabel : "Choose a target and run the protocol. The output will separate clean-split generalization, stress robustness, and falsification evidence."}</p>
+                  <h3>{error ? "This setup needs one fix" : "Building the worked example"}</h3>
+                  <p>{error ?? "StressFold is fitting the demo model, reserving unseen rows, applying four controlled stresses, and repeating the split."}</p>
                 </div>
               )}
             </section>
@@ -419,57 +549,41 @@ export function StressFoldApp() {
 
         <section className="method-section section-boundary" id="method">
           <div className="section-heading compact-heading">
-            <div><div className="eyebrow">Method, not magic</div><h2>Noise sensitivity is not proof of overfitting.</h2></div>
-            <p>StressFold keeps different estimands separate. A model can be brittle without being overfit; a flexible model can fit random labels and still generalize on real signal.</p>
+            <div><div className="eyebrow">Interpretation boundary</div><h2>A stress profile is evidence, not a certificate.</h2></div>
+            <p>A model can be sensitive without being overfit, and a clean holdout result can still fail after time drift, leakage, or a population change.</p>
           </div>
-          <div className="method-grid">
-            <article>
-              <div className="method-number">01</div>
-              <span>Generalization</span>
-              <h3>Measure the clean split gap.</h3>
-              <code>G<sub>b</sub> = L<sub>audit,b</sub> - L<sub>train,b</sub></code>
-              <p>Repeated splits expose optimism and refit variability. Preprocessing is learned inside each training fold.</p>
-            </article>
-            <article>
-              <div className="method-number">02</div>
-              <span>Robustness</span>
-              <h3>Trace the full severity path.</h3>
-              <code>R<sub>j</sub>(λ) = retained skill</code>
-              <p>Feature noise and missingness hold the model fixed. Label corruption and train-size tests refit it.</p>
-            </article>
-            <article>
-              <div className="method-number">03</div>
-              <span>Falsification</span>
-              <h3>Try to break the signal.</h3>
-              <code>p = (1 + exceedances) / (B + 1)</code>
-              <p>Permutation nulls and leakage checks ask whether apparent performance survives a deliberately hostile control.</p>
-            </article>
-          </div>
-
           <div className="scope-grid">
             <div className="scope-card">
-              <div className="eyebrow">Why no diffusion in v0.1</div>
-              <h3>A generator adds another fitted model to validate.</h3>
-              <p>Diffusion can create plausible tabular replicas, but it also introduces fidelity, mode-collapse, copying, and target-leakage risks. The first release uses transparent stress operators and empirical resampling. Conditional copulas and TabDDPM remain optional research backends only after independent fidelity and authenticity checks.</p>
+              <div className="eyebrow">What the browser does</div>
+              <h3>It audits a transparent baseline on your CSV.</h3>
+              <p>That makes the method easy to inspect and the generated stress datasets easy to reuse. It does not silently pretend to be your deployed model.</p>
             </div>
             <div className="scope-card dark">
-              <div className="eyebrow">Claim boundary</div>
-              <h3>Passing the suite means surviving this audit.</h3>
-              <p>It does not establish the absence of overfitting, arbitrary-shift robustness, causal validity, fairness, or privacy. Those require their own designs and source data.</p>
-              <ul><li>i.i.d. tabular v1</li><li>binary + regression</li><li>group/time splits in Python roadmap</li></ul>
+              <div className="eyebrow">What the Python package adds</div>
+              <h3>Bring the model and preprocessing you actually use.</h3>
+              <p>The same stress protocol can wrap a scikit-learn compatible pipeline so fitting, preprocessing, and refitting happen inside each training split.</p>
+              <ul><li>binary classification</li><li>regression</li><li>custom pipelines</li></ul>
             </div>
           </div>
+          <details className="math-notes">
+            <summary>Show the equations with a worked example</summary>
+            <div className="math-notes__grid">
+              <article><span>Generalization gap</span><code>unseen loss − training loss</code><p>If unseen loss is 0.22 and training loss is 0.08, the gap is 0.14 extra error on new rows.</p></article>
+              <article><span>Retained skill</span><code>(reference loss − stressed loss) ÷ (reference loss − clean loss)</code><p>100% means the stress changed nothing; 50% means half the useful advantage remains; 0% means no advantage over the simple reference.</p></article>
+              <article><span>Monte Carlo summary</span><code>repeat → sort → median + middle 90%</code><p>Here “Monte Carlo” only means repeating controlled random splits. The band shows run-to-run variation, not a universal confidence guarantee.</p></article>
+            </div>
+          </details>
         </section>
 
         <section className="paper-section" id="paper">
-          <div className="paper-index">SF / 01</div>
+          <div className="paper-index">SF / 02</div>
           <div className="paper-copy">
             <div className="eyebrow">Technical note</div>
             <h2>Perturbation-response profiling for tabular model generalization</h2>
-            <p>The accompanying paper formalizes the protocol, stress operators, paired Monte Carlo summaries, null controls, and known-data-generating-process benchmarks. Every figure is reproduced from a fixed script and configuration.</p>
+            <p>The paper defines the split protocol, four stress operators, repeated-run summaries, shuffled-label control, assumptions, and claim boundaries. The LaTeX source is included.</p>
             <div className="paper-actions">
               <a className="button button-primary" href="/paper/stressfold.pdf" target="_blank" rel="noreferrer">Read the paper</a>
-              <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">LaTeX source</a>
+              <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">Read the LaTeX</a>
             </div>
           </div>
           <div className="citation-block">
@@ -481,8 +595,8 @@ export function StressFoldApp() {
 
       <footer className="site-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>StressFold</span></div>
-        <p>Generalization stress tests for tabular models.</p>
-        <div><a href="#method">Method</a><a href="#paper">Paper</a><a href="#top">Back to top</a></div>
+        <p>Controlled model stress tests, with the limits left visible.</p>
+        <div><a href="#learn">Learn</a><a href="#paper">Paper</a><a href="#top">Back to top</a></div>
       </footer>
     </div>
   );
@@ -497,9 +611,31 @@ function formatMetric(value: number) {
   return value.toFixed(Math.abs(value) < 0.1 ? 3 : 2);
 }
 
-function operatorColor(id: string) {
-  if (id === "feature-noise") return "teal";
-  if (id === "label-noise") return "amber";
-  if (id === "missingness") return "violet";
-  return "gold";
+function modelName(model: ModelKind) {
+  return model === "regularized" ? "steady linear baseline" : "flexible neighbor baseline";
+}
+
+function buildResultHeadline(result: AuditResult, weakestLabel: string) {
+  const score = result.baseline.score;
+  const signal = result.baseline.scoreLabel === "AUROC"
+    ? score >= 0.75 ? "useful signal" : score >= 0.6 ? "some signal" : "weak signal"
+    : score >= 0.5 ? "useful signal" : score > 0 ? "some signal" : "weak signal";
+  return `The demo finds ${signal}; ${weakestLabel.toLowerCase()} is its weakest stress path.`;
+}
+
+function plainFindingLabel(kind: AuditFinding["kind"]) {
+  if (kind === "generalization") return "Practice versus exam";
+  if (kind === "robustness") return "Weakest stress";
+  return "Real signal versus nonsense";
+}
+
+function plainFindingDetail(finding: AuditFinding, result: AuditResult) {
+  if (finding.kind === "generalization") {
+    return `Training loss was ${formatMetric(result.baseline.trainLoss)} and unseen-row loss was ${formatMetric(result.baseline.auditLoss)}. Their difference is ${formatMetric(result.baseline.gap)}; a large positive difference is an overfitting warning.`;
+  }
+  if (finding.kind === "robustness") {
+    const weakest = [...result.summaries].sort((left, right) => right.degradationArea - left.degradationArea)[0];
+    return `${weakest.label} removed the most skill across the tested levels. Open the curve above to see the first severity where the decline appears.`;
+  }
+  return `The real target beat about ${Math.round(result.permutation.percentile)}% of the shuffled-label refits. Shuffling deliberately destroys the relationship the model is supposed to learn.`;
 }

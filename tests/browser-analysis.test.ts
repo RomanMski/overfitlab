@@ -9,6 +9,25 @@ import {
 } from "../app/lib/analysis";
 import { parseCsv, tableToCsv } from "../app/lib/csv";
 
+test("task inference reserves classification for binary targets", () => {
+  const stringBinary = parseCsv(
+    "feature,target\n1,retain\n2,churn\n3,retain\n4,churn\n",
+    "string-binary.csv",
+  );
+  const numericBinary = parseCsv(
+    "feature,target\n1,0\n2,1\n3,0\n4,1\n",
+    "numeric-binary.csv",
+  );
+  const numericOutcome = parseCsv(
+    "feature,target\n1,10\n2,20\n3,30\n4,40\n",
+    "numeric-outcome.csv",
+  );
+
+  assert.equal(inferTask(stringBinary, "target"), "classification");
+  assert.equal(inferTask(numericBinary, "target"), "classification");
+  assert.equal(inferTask(numericOutcome, "target"), "regression");
+});
+
 test("sample audit is deterministic and returns all evidence families", async () => {
   const table = makeSampleDataset();
   const target = inferTarget(table);
@@ -36,6 +55,47 @@ test("sample audit is deterministic and returns all evidence families", async ()
     "falsification",
   ]);
   assert.ok(first.baseline.score >= 0 && first.baseline.score <= 1);
+});
+
+test("every viable sample target completes a four-repeat audit", async () => {
+  const table = makeSampleDataset();
+  const viableTargets = table.headers.filter((target) => {
+    const values = table.rows
+      .map((row) => row[target])
+      .filter((value): value is string | number => value !== null && value !== "");
+    const uniqueValues = new Set(values.map(String));
+    const isBinary = uniqueValues.size === 2;
+    const isNumeric = values.length > 0 && values.every((value) => Number.isFinite(Number(value)));
+    return isBinary || isNumeric;
+  });
+
+  assert.deepEqual(viableTargets, [
+    "age",
+    "tenure_months",
+    "weekly_sessions",
+    "median_latency_ms",
+    "support_tickets_90d",
+    "monthly_price",
+    "churn",
+  ]);
+
+  for (const [index, target] of viableTargets.entries()) {
+    const task = inferTask(table, target);
+    const result = await runAudit(table, {
+      target,
+      task,
+      model: "regularized",
+      repeats: 4,
+      testSize: 0.25,
+      seed: 1729 + index,
+    });
+
+    assert.equal(result.dataset.target, target);
+    assert.equal(result.dataset.task, task);
+    assert.equal(result.protocol.repeats, 4);
+    assert.equal(result.curves.length, 4);
+    assert.ok(Number.isFinite(result.baseline.score), `${target} should produce a finite baseline score`);
+  }
 });
 
 test("stress variant preserves target values under feature noise", () => {

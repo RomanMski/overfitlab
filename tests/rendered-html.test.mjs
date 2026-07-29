@@ -22,10 +22,13 @@ test("server-renders the StressFold research instrument", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>StressFold - Generalization stress tests for tabular models<\/title>/i);
-  assert.match(html, /Find where a model/);
-  assert.match(html, /stops generalizing/);
-  assert.match(html, /Run stress audit/);
-  assert.match(html, /Noise sensitivity is not proof of overfitting/);
+  assert.match(html, /Does your model still work when the data gets slightly worse/);
+  assert.match(html, /Build the worked example/);
+  assert.match(html, /A stress profile is evidence, not a certificate/);
+  assert.match(html, /Five ideas, no statistical shorthand required/);
+  assert.match(html, /one roll of the dice/i);
+  assert.match(html, /What it cannot prove/);
+  assert.doesNotMatch(html, /No audit result yet/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 

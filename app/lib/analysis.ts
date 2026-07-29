@@ -85,6 +85,7 @@ export interface AuditResult {
     repeats: number;
     testSize: number;
     seed: number;
+    model: ModelKind;
     sourceHash: string;
     generatedAt: string;
     browserEngine: string;
@@ -177,7 +178,7 @@ export function inferTask(table: DataTable, target: string): TaskType {
     .map((row) => row[target])
     .filter((value): value is string | number => value !== null && value !== "");
   const unique = new Set(values.map(String));
-  if (unique.size >= 2 && unique.size <= 12) return "classification";
+  if (unique.size === 2) return "classification";
   const numericShare = values.length
     ? values.filter((value) => Number.isFinite(Number(value))).length / values.length
     : 0;
@@ -326,6 +327,7 @@ export async function runAudit(
       repeats,
       testSize: settings.testSize,
       seed: settings.seed,
+      model: settings.model,
       sourceHash: fingerprint(table),
       generatedAt: new Date().toISOString(),
       browserEngine: "StressFold browser protocol 0.1",

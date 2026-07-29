@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 const title = "StressFold - Generalization stress tests for tabular models";
 const description =
-  "Trace model performance across controlled perturbations, repeated refits, and permutation nulls with reproducible stress datasets.";
+  "See whether a tabular model survives unseen rows, measurement noise, missing values, less data, and shuffled-label checks—then export repeatable stress datasets.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
