@@ -57,7 +57,7 @@ StressFold is built around a negative claim: no finite collection of resamples o
   \item \textbf{Falsification} asks whether the entire observed workflow could produce its result under a specified null.
 \end{enumerate}
 
-\noindent\textbf{Contribution and non-claim.}
+\noindent\textbf{Contribution, and what is not claimed.}
 The contribution is a synthesis and reproducible implementation of established validation ideas, together with controlled counterexamples that show why their outputs should not be collapsed into a single score. There is no new statistical theorem here. Nothing below amounts to a universal test for overfitting or a guarantee of performance once the deployment distribution moves.
 
 Release 0.2 implements repeated holdout, four stress operators, and descriptive null diagnostics. Full-workflow permutation inference, group- and time-aware splitting, and generator auditing remain reference-protocol components rather than current software claims.
@@ -73,7 +73,7 @@ Figure~\ref{fig:estimands} gives the central controlled example. The data-genera
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/estimand_separation.pdf}
-  \caption{\textbf{Generalization and robustness are distinct estimands.} (A) Mean Brier losses and 95\% Monte Carlo intervals across 54 independent training samples of size 320. Population loss uses 2,600 fresh cases per sample and the known Bernoulli probabilities. (B) Retained skill under correlated measurement noise for a fixed sample of 420 training and 3,200 latent audit cases, averaged over 44 common perturbation draws. Values above one indicate improvement relative to clean skill, not super-generalization. The interpolating tree's noise response illustrates why robustness cannot be used as a proxy for clean predictive risk.}
+  \caption{\textbf{Generalization and robustness are distinct estimands.} (A) Mean Brier losses and 95\% Monte Carlo intervals across 50 independent training samples of size 300. Population loss uses 2,500 fresh cases per sample and the known Bernoulli probabilities. (B) Retained skill under correlated measurement noise for a fixed sample of 400 training and 3,000 latent audit cases, averaged over 40 common perturbation draws. Values above one indicate improvement relative to clean skill, which is a property of this particular perturbation and not a sign of superior generalization. The interpolating tree's noise response illustrates why robustness cannot be used as a proxy for clean predictive risk.}
   \label{fig:estimands}
 \end{figure*}
 
@@ -147,14 +147,14 @@ For exchangeability blocks \(C\), the permutation null is
 \[
   H_0: Y\perp X\mid C.
 \]
-Let \(T(A,\data)\) be a higher-is-better statistic produced by the complete pipeline. With \(M\) valid label permutations,
+Let \(T(A,\data)\) be a statistic for which higher values are better, produced by the complete pipeline. With \(M\) valid label permutations,
 \begin{equation}
   p=\frac{1+\sum_{m=1}^M
   \ind\{T(A,\data_m^{\pi})\geq T(A,\data)\}}
   {M+1}.
   \label{eq:permutation}
 \end{equation}
-Every permutation repeats preprocessing, selection, and tuning. The test asks whether the workflow found structure beyond the stated null \citep{ojala2010permutation}. It does not show that the structure is causal, free of leakage, stable, or useful in a new domain. A separate random-label capacity curve corrupts a fraction of training labels, refits, and contrasts the corrupted-label training fit with clean audit loss. That curve describes memorization capacity and carries no significance interpretation.
+Every permutation repeats preprocessing, selection, and tuning. The test asks whether the workflow found structure beyond the stated null \citep{ojala2010permutation}. It does not show that the structure is causal, free of leakage, stable, or useful in a new domain. A separate random-label capacity curve corrupts a fraction of training labels, refits, and contrasts the training fit on corrupted labels with clean audit loss. That curve describes memorization capacity and carries no significance interpretation.
 
 \section{Perturbation operators}
 
@@ -174,7 +174,7 @@ Categorical transition & Independently retain level \(a\), or sample \(a'\sim K_
 Missingness & Apply a mask at rate \(\lambda\). MCAR is explicit. MAR requires a user-supplied mechanism. & Robustness to the named observation process, including the fitted imputer. \\
 Tail contamination & Replace a prespecified fraction of cells or rows with empirical-tail values subject to schema constraints. & Sensitivity to outliers within observed support, not adversarial robustness. \\
 Covariate tilt & \(w_i(\delta,v)\propto\exp(\delta v^\top z_i)\). Resample complete observed rows and report effective sample size. & Reweighted empirical shift along a named risk direction, with observed labels still attached. \\
-Training-label corruption & Replace a fraction \(q\) of training labels and rerun \(A\). Never corrupt the clean audit labels. & Memorization and regularization response, not a deployment-performance estimate. \\
+Training-label corruption & Replace a fraction \(q\) of training labels and rerun \(A\). Never corrupt the clean audit labels. & Memorization and regularization response, not an estimate of deployment performance. \\
 Local smoothed bootstrap & Resample a complete row, perturb numeric fields locally, and modify categories within a declared neighborhood. & Local support probing. Labels are retained only for features declared label-invariant. \\
 \bottomrule
 \end{tabular}
@@ -203,7 +203,7 @@ The practical protocol is:
 \begin{enumerate}
   \item Validate schema, constraints, row identity, grouping, and temporal order, then scan for exact and near duplicates across the intended split.
   \item Construct outer splits. Inside each \(\train_b\), fit all transforms and select hyperparameters. Freeze \(f_b\).
-  \item Evaluate clean \(\audit_b\), then apply training-calibrated operators to that same audit fold at a prespecified severity grid and seed schedule.
+  \item Evaluate clean \(\audit_b\), then apply operators calibrated on the training fold to that same audit fold at a prespecified severity grid and seed schedule.
   \item Refit \(A\) on cluster- or block-bootstrap versions of \(\train_b\) and predict the unchanged \(\audit_b\) to measure refit instability.
   \item Run label permutations within valid blocks, repeating the complete workflow. Run training-label corruption as a separate descriptive experiment.
   \item Fit any replica generator on \(\train_b\) only, and audit it against real \(\audit_b\) before using its rows as stress probes.
@@ -214,14 +214,14 @@ For a locked holdout, uncertainty in an additive loss difference is obtained by 
 
 \section{Controlled checks of aggregation and falsification}
 
-Figure~\ref{fig:mc} isolates two protocol choices. First, paired perturbations give each model the same Monte Carlo difficulty. At \(R=16\), independent draws had 1.83 times the estimator standard deviation of common draws in the deterministic experiment. Pairing does not remove sample uncertainty, but it avoids paying unnecessary simulation variance in a model comparison.
+Figure~\ref{fig:mc} isolates two protocol choices. First, paired perturbations give each model the same Monte Carlo difficulty. At \(R=16\), independent draws had 1.87 times the estimator standard deviation of common draws in the deterministic experiment. Pairing does not remove sample uncertainty, but it avoids paying unnecessary simulation variance in a model comparison.
 
-Second, a permutation test must repeat selection. Under a pure null, 40 random binary predictors were scored on the same 160 cases and the best was selected. Permuting labels while holding that winner fixed produced a 72.1\% false-positive rate at nominal 5\%. Repeating the full 40-way selection inside each of 199 permutations reduced the empirical rate to 5.7\% over 140 null repetitions. The example is deliberately stark, so that the conditioning error becomes visible without any appeal to asymptotics.
+Second, a permutation test must repeat selection. Under a pure null, 40 random binary predictors were scored on the same 200 cases and the best was selected. Permuting labels while holding that winner fixed produced a 77.3\% false-positive rate at nominal 5\%. Repeating the full 40-way selection inside each of 199 permutations reduced the empirical rate to 4.0\% over 150 null repetitions. The example is deliberately stark, so that the conditioning error becomes visible without any appeal to asymptotics.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/paired_monte_carlo.pdf}
-  \caption{\textbf{Pairing improves precision, and full-workflow permutation restores nominal calibration in this controlled simulation.} (A) Sampling distributions of the depth-three minus depth-four loss contrast at severity \(\lambda=0.42\), using eight draws and a pool of 1,200 deterministic perturbations. (B) Estimator standard deviation over 900 Monte Carlo resamples at each \(R\). (C) Null false-positive rates for a selected random predictor when model choice is held fixed versus repeated inside every permutation.}
+  \caption{\textbf{Pairing improves precision, and full-workflow permutation restores nominal calibration in this controlled simulation.} (A) Sampling distributions of the depth-three minus depth-four loss contrast at severity \(\lambda=0.40\), using eight draws and a pool of 1,000 deterministic perturbations. (B) Estimator standard deviation over 1,000 Monte Carlo resamples at each \(R\). (C) Null false-positive rates for a selected random predictor when model choice is held fixed versus repeated inside every permutation.}
   \label{fig:mc}
 \end{figure*}
 
@@ -234,16 +234,16 @@ A learned generator \(G(\train_b)\) is a random function of the same finite trai
 The reference protocol therefore evaluates a generator along separate axes:
 \begin{itemize}
   \item \textbf{Fidelity.} Held-out classifier two-sample testing (C2ST) \citep{lopezpaz2017c2st} and maximum mean discrepancy (MMD) with permutation calibration \citep{gretton2012mmd}.
-  \item \textbf{Coverage.} Marginal, pairwise, subgroup, and target-conditional discrepancies, with precision/recall-style support diagnostics \citep{alaa2022faithful}.
+  \item \textbf{Coverage.} Marginal, pairwise, subgroup, and target-conditional discrepancies, with support diagnostics in the style of precision and recall \citep{alaa2022faithful}.
   \item \textbf{Authenticity.} Exact copies, and train-to-synthetic versus holdout-to-synthetic nearest-neighbor structure.
   \item \textbf{Utility.} A fixed reference model trained on synthetic data and evaluated on the untouched real holdout (TSTR).
 \end{itemize}
-A C2ST AUC near one indicates a detectable difference. A value near one half means the classifier failed to distinguish the two samples, which is weaker than evidence of equality. MMD carries the same power caveat. Synthetic-only evaluation is never treated as unbiased real-population evaluation, and methods that combine generated with real labels need an explicit correction design \citep{boyeau2025autoeval}.
+A C2ST AUC near one indicates a detectable difference. A value near one half means the classifier failed to distinguish the two samples, which is weaker than evidence of equality. MMD carries the same power caveat. Synthetic-only evaluation is never treated as unbiased evaluation against the real population, and methods that combine generated with real labels need an explicit correction design \citep{boyeau2025autoeval}.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/synthetic_replica_audit.pdf}
-  \caption{\textbf{Marginal fidelity does not imply predictive fidelity.} In the known DGP, class labels select opposite diagonal modes. A smoothed row bootstrap preserves that joint structure, while independently sampling each feature within class preserves conditional one-dimensional marginals but destroys dependence. The marginal generator's mean conditional KS discrepancy is only 0.059, yet its real-holdout TSTR accuracy is 0.504. Bar labels are rounded, and the dashed line marks chance.}
+  \caption{\textbf{Marginal fidelity does not imply predictive fidelity.} In the known DGP, class labels select opposite diagonal modes. A smoothed row bootstrap preserves that joint structure, while independently sampling each feature within class preserves conditional one-dimensional marginals but destroys dependence. The marginal generator's mean conditional KS discrepancy is only 0.069, yet its real-holdout TSTR accuracy is 0.463. Bar labels are rounded, and the dashed line marks chance.}
   \label{fig:synthetic}
 \end{figure*}
 
@@ -255,7 +255,7 @@ Figure~\ref{fig:synthetic} constructs the failure analytically. Draw \(Y\sim\mat
   \qquad
   \epsilon_j\sim N(0,0.3^2).
 \]
-Each class has identical one-dimensional marginals but opposite dependence. Training contains 850 rows and the real holdout 3,200. The empirical bootstrap copies all generated rows, the smoothed bootstrap adds \(N(0,0.12^2)\) noise, and the marginal generator samples \(X_1\) and \(X_2\) independently within class. Table~\ref{tab:synthetic} shows why generator claims require more than one diagnostic. The orientation-free C2ST value is \(\max(\mathrm{AUC},1-\mathrm{AUC})\).
+Each class has identical one-dimensional marginals but opposite dependence. Training contains 800 rows and the real holdout 3,000. The empirical bootstrap copies all generated rows, the smoothed bootstrap adds \(N(0,0.12^2)\) noise, and the marginal generator samples \(X_1\) and \(X_2\) independently within class. Table~\ref{tab:synthetic} shows why generator claims require more than one diagnostic. The C2ST value is reported without orientation, as \(\max(\mathrm{AUC},1-\mathrm{AUC})\).
 
 \begin{table*}[t]
   \centering
@@ -265,23 +265,23 @@ Each class has identical one-dimensional marginals but opposite dependence. Trai
   \resizebox{0.93\textwidth}{!}{\input{tables/synthetic_diagnostics.tex}}
 \end{table*}
 
-The empirical bootstrap has excellent utility and dependence fidelity but a 100\% exact-copy rate. The smoothed bootstrap removes exact copies in this continuous example while retaining utility. Neither result is a privacy guarantee. The marginal generator appears acceptable under univariate checks yet fails both dependence and downstream utility. A strong audit keeps those conclusions separate rather than averaging them into a generator score.
+The empirical bootstrap has excellent utility and dependence fidelity but every generated row is an exact copy. The smoothed bootstrap removes exact copies in this continuous example while retaining utility. Neither result is a privacy guarantee. The marginal generator appears acceptable under univariate checks yet fails both dependence and downstream utility. A strong audit keeps those conclusions separate rather than averaging them into a generator score.
 
 \section{Reproducibility and implementation boundary}
 
-The reference experiment script, \texttt{scripts/reproduce\_paper.py}, is independent of the package API. It uses NumPy, SciPy, pandas-compatible CSV output, Matplotlib, and scikit-learn with a fixed root seed of 20260729 and single-threaded estimators. It regenerates every plotted PDF/PNG and both LaTeX/CSV tables. The DGP equations, sample sizes, replicate counts, model settings, and Monte Carlo schedules are encoded directly in that script.
+The reference experiment script, \texttt{scripts/reproduce\_paper.py}, is independent of the package API. It uses NumPy, SciPy, CSV output that pandas can read, Matplotlib, and scikit-learn with a fixed root seed of 20260729 and single-threaded estimators. It regenerates every plotted PDF/PNG and both LaTeX/CSV tables. The DGP equations, sample sizes, replicate counts, model settings, and Monte Carlo schedules are encoded directly in that script.
 
 The current interfaces implement a bounded subset of this reference protocol, and they do not embody every equation above. Browser protocol 0.3 uses independent standardized numeric noise, a protected retained-skill denominator, and a tie-adjusted descriptive null rank. Python package 0.2 reports a pooled paired null-exceedance rate across repeated holdouts and stops short of calling it a permutation \(p\)-value. Equation~\eqref{eq:permutation} requires coherent dataset-level permutations, a complete workflow rerun, and one prespecified aggregate statistic per permutation.
 
-A production run should serialize more than an image. The record needs data and schema fingerprints, target and feature roles, constraints, exact split indices, estimator and preprocessing specifications, the seed tree, perturbation parameters, rejected-row counts, software versions, and the raw per-case and per-draw losses. Report generation happens downstream of that record, which is never edited in place. A local-first browser interface can compute a bounded baseline directly, as the current lab does, or hand off to a richer local Python audit. Deep generators stay optional, and the browser never depends on them.
+A production run should serialize more than an image. The record needs data and schema fingerprints, target and feature roles, constraints, exact split indices, estimator and preprocessing specifications, the seed tree, perturbation parameters, counts of rejected rows, software versions, and the raw per-case and per-draw losses. Report generation happens downstream of that record, which is never edited in place. A local-first browser interface can compute a bounded baseline directly, as the current lab does, or hand off to a richer local Python audit. Deep generators stay optional, and the browser never depends on them.
 
-The controlled results are deterministic conditional on the documented software stack, subject to small floating-point and library-version differences. The simulation intervals quantify repetition in the stated DGP, not epistemic uncertainty about whether that DGP resembles a user's deployment environment.
+The controlled results are deterministic conditional on the documented software stack, subject to small floating-point effects and differences in library versions. The simulation intervals quantify repetition in the stated DGP, not epistemic uncertainty about whether that DGP resembles a user's deployment environment.
 
 \section{Limitations and open questions}
 
 \textbf{Operator validity is the main limitation.} Gaussian noise, empirical tilts, and local resampling are convenient, not universal. A response curve is only as relevant as its mechanism. Natural held-out domains should be used whenever available, and failure to observe a natural shift must not be translated into evidence of robustness.
 
-\textbf{Labels may cease to be valid.} Large feature perturbations can move a row across the true decision boundary. Without a simulator or label oracle, retained-label accuracy then mixes model error with annotation invalidity. StressFold falls back to prediction consistency and reports the absence of a correctness claim.
+\textbf{Labels may cease to be valid.} Large feature perturbations can move a row across the true decision boundary. Without a simulator or label oracle, accuracy against the retained label then mixes model error with annotation invalidity. StressFold falls back to prediction consistency and reports the absence of a correctness claim.
 
 \textbf{Exchangeability can fail.} Permutation tests, ordinary bootstrap, and random splitting all rely on a sampling unit. Households, patients, devices, sites, and time intervals require explicit blocks. A valid blocked null may have few permutations and low power.
 

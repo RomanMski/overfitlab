@@ -46,15 +46,15 @@ Every figure below is regenerated from `scripts/reproduce_paper.py` at a fixed r
 
 ![Generalization and robustness are distinct estimands](paper/figures/estimand_separation.png)
 
-Training loss falls to zero as the tree deepens, but population Brier loss is minimized at depth 2 (0.187) and degrades to 0.319 once the tree interpolates. Under correlated measurement noise the interpolating tree *improves*, while the depth-3 model loses skill. Robustness therefore cannot stand in for clean predictive risk, because here the two move in opposite directions.
+Training loss falls to zero as the tree deepens, but population Brier loss is minimized at depth 2 (0.188) and degrades to 0.324 once the tree interpolates. Under correlated measurement noise the interpolating tree *improves*, while the depth-3 model loses skill. Robustness therefore cannot stand in for clean predictive risk, because here the two move in opposite directions.
 
 ![Pairing improves precision and full-workflow permutation restores calibration](paper/figures/paired_monte_carlo.png)
 
-Giving every candidate model the same perturbation draws cuts simulation variance, and at R = 16 independent draws carry 1.83 times the estimator standard deviation of common draws. Panel C is the sharper warning. Selecting the best of 40 random predictors and then permuting labels around that fixed winner yields a 72.1% false-positive rate at a nominal 5%. Repeating the full 40-way selection inside every permutation brings it back to 5.7%.
+Giving every candidate model the same perturbation draws cuts simulation variance, and at R = 16 independent draws carry 1.87 times the estimator standard deviation of common draws. Panel C is the sharper warning. Selecting the best of 40 random predictors and then permuting labels around that fixed winner yields a 77.3% false-positive rate at a nominal 5%. Repeating the full 40-way selection inside every permutation brings it back to 4.0%.
 
 ![Marginal fidelity does not imply predictive fidelity](paper/figures/synthetic_replica_audit.png)
 
-A generator that samples each feature independently within class reproduces the one-dimensional marginals almost exactly, with a mean class-conditional KS discrepancy of 0.059, and still destroys the dependence that carries the signal. Its real-holdout accuracy is 0.504, which is chance. This is why generated rows are treated as stress instruments and never as holdout evidence.
+A generator that samples each feature independently within class reproduces the one-dimensional marginals almost exactly, with a mean class-conditional KS discrepancy of 0.069, and still destroys the dependence that carries the signal. Its real-holdout accuracy is 0.463, no better than chance, while the two bootstrap generators stay at 0.998. This is why generated rows are treated as stress instruments and never as holdout evidence.
 
 ## Install
 

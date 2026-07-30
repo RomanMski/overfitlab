@@ -189,12 +189,12 @@ def run_generalization_experiment(rng: np.random.Generator) -> GeneralizationRes
     covariance = covariance_matrix()
     depths: list[int | None] = [1, 2, 3, 5, 8, None]
     labels = ["1", "2", "3", "5", "8", "unpruned"]
-    train_losses = np.empty((54, len(depths)))
+    train_losses = np.empty((50, len(depths)))
     test_losses = np.empty_like(train_losses)
 
     for rep in range(train_losses.shape[0]):
-        x_train, y_train, _ = sample_generalization_dgp(rng, 320, covariance)
-        x_test, _, p_test = sample_generalization_dgp(rng, 2600, covariance)
+        x_train, y_train, _ = sample_generalization_dgp(rng, 300, covariance)
+        x_test, _, p_test = sample_generalization_dgp(rng, 2500, covariance)
         for j, depth in enumerate(depths):
             model = DecisionTreeClassifier(
                 max_depth=depth,
@@ -212,8 +212,8 @@ def run_generalization_experiment(rng: np.random.Generator) -> GeneralizationRes
     train_stats = np.array([mean_interval(train_losses[:, j]) for j in range(len(depths))])
     test_stats = np.array([mean_interval(test_losses[:, j]) for j in range(len(depths))])
 
-    x_train, y_train, _ = sample_generalization_dgp(rng, 420, covariance)
-    x_audit, _, p_audit = sample_generalization_dgp(rng, 3200, covariance)
+    x_train, y_train, _ = sample_generalization_dgp(rng, 400, covariance)
+    x_audit, _, p_audit = sample_generalization_dgp(rng, 3000, covariance)
     regularized = DecisionTreeClassifier(
         max_depth=3, min_samples_leaf=6, random_state=31_415
     ).fit(x_train, y_train)
@@ -224,10 +224,10 @@ def run_generalization_experiment(rng: np.random.Generator) -> GeneralizationRes
         max_depth=4, min_samples_leaf=6, random_state=16_180
     ).fit(x_train, y_train)
 
-    noise_levels = np.array([0.00, 0.08, 0.16, 0.28, 0.42, 0.60, 0.85])
+    noise_levels = np.array([0.00, 0.10, 0.20, 0.30, 0.40, 0.60, 0.80])
     chol = np.linalg.cholesky(covariance)
     prior = float(y_train.mean())
-    skill_draws = np.empty((44, noise_levels.size, 2))
+    skill_draws = np.empty((40, noise_levels.size, 2))
 
     clean_losses = np.array(
         [
@@ -292,7 +292,7 @@ def plot_estimands(result: GeneralizationResult, output: Path) -> None:
     ax.text(
         0.0,
         1.015,
-        "Mean and 95% Monte Carlo interval over 54 training samples",
+        "Mean and 95% Monte Carlo interval over 50 training samples",
         transform=ax.transAxes,
         color=MUTED,
         fontsize=7.0,
@@ -370,8 +370,8 @@ def run_monte_carlo_experiment(
     latent_p = generalization.fixed_audit_p[:700]
     covariance = generalization.covariance
     chol = np.linalg.cholesky(covariance)
-    severity = 0.42
-    pool_size = 1200
+    severity = 0.40
+    pool_size = 1000
     loss_a = np.empty(pool_size)
     loss_b = np.empty(pool_size)
 
@@ -388,8 +388,8 @@ def run_monte_carlo_experiment(
     unpaired_r8 = np.empty(0)
 
     for j, r_count in enumerate(r_values):
-        paired_samples = np.empty(900)
-        unpaired_samples = np.empty(900)
+        paired_samples = np.empty(1000)
+        unpaired_samples = np.empty(1000)
         for k in range(paired_samples.size):
             paired_idx = rng.integers(0, pool_size, size=r_count)
             idx_a = rng.integers(0, pool_size, size=r_count)
@@ -424,9 +424,9 @@ def selection_aware_permutation_pvalues(
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Null experiment: select the best of 40 random predictors on audit data."""
-    repetitions = 140
+    repetitions = 150
     permutations = 199
-    n = 160
+    n = 200
     candidates = 40
     naive = np.empty(repetitions)
     full = np.empty(repetitions)
@@ -581,7 +581,7 @@ def c2st_auc(
     synthetic_x: np.ndarray,
     synthetic_y: np.ndarray,
 ) -> float:
-    n = min(real_x.shape[0], synthetic_x.shape[0], 900)
+    n = min(real_x.shape[0], synthetic_x.shape[0], 1000)
     real_idx = rng.choice(real_x.shape[0], size=n, replace=False)
     synthetic_idx = rng.choice(synthetic_x.shape[0], size=n, replace=False)
     real_joint = np.column_stack([real_x[real_idx], real_y[real_idx]])
@@ -594,7 +594,7 @@ def c2st_auc(
         x, labels, test_size=0.40, stratify=labels, random_state=7_331
     )
     discriminator = RandomForestClassifier(
-        n_estimators=180,
+        n_estimators=200,
         max_depth=7,
         min_samples_leaf=5,
         n_jobs=1,
@@ -647,17 +647,17 @@ class SyntheticResult:
 
 
 def run_synthetic_experiment(rng: np.random.Generator) -> SyntheticResult:
-    train_x, train_y = sample_xor_dgp(rng, 850)
-    test_x, test_y = sample_xor_dgp(rng, 3200)
+    train_x, train_y = sample_xor_dgp(rng, 800)
+    test_x, test_y = sample_xor_dgp(rng, 3000)
     generated = {
-        "Empirical bootstrap": empirical_bootstrap(rng, train_x, train_y, 850),
-        "Smoothed bootstrap": smoothed_bootstrap(rng, train_x, train_y, 850),
-        "Independent marginals": independent_class_marginals(rng, train_x, train_y, 850),
+        "Empirical bootstrap": empirical_bootstrap(rng, train_x, train_y, 800),
+        "Smoothed bootstrap": smoothed_bootstrap(rng, train_x, train_y, 800),
+        "Independent marginals": independent_class_marginals(rng, train_x, train_y, 800),
     }
 
     diagnostics: list[dict[str, float | str]] = []
     baseline_model = RandomForestClassifier(
-        n_estimators=220,
+        n_estimators=200,
         max_depth=7,
         min_samples_leaf=3,
         n_jobs=1,
@@ -677,7 +677,7 @@ def run_synthetic_experiment(rng: np.random.Generator) -> SyntheticResult:
 
     for j, (name, (sx, sy)) in enumerate(generated.items()):
         utility_model = RandomForestClassifier(
-            n_estimators=220,
+            n_estimators=200,
             max_depth=7,
             min_samples_leaf=3,
             n_jobs=1,
