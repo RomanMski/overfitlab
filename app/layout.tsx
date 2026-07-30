@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "StressFold | An overfitting test for tabular models";
+const title = "StressFold | How much of your backtest is the search?";
 const description =
-  "Test a tabular model for overfitting. Measures how much worse it does on unseen data, how fast it degrades under noise, missing values, wrong labels and smaller training sets, and whether its skill survives a label shuffle.";
+  "Measure how much of a backtest result came from searching rather than from skill. Deflated Sharpe ratio and probability of backtest overfitting, over the trials you already ran.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -37,11 +37,11 @@ export async function generateMetadata(): Promise<Metadata> {
       shortcut: "/favicon.svg",
     },
     keywords: [
-      "model validation",
+      "backtest overfitting",
       "overfitting",
       "generalization",
       "robustness testing",
-      "tabular machine learning",
+      "quantitative finance",
     ],
     openGraph: {
       type: "website",

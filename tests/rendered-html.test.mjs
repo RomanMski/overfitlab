@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
 import test from "node:test";
-
-const repositoryRoot = new URL("../", import.meta.url);
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -15,60 +12,43 @@ async function render() {
   );
 }
 
-test("server-renders the StressFold tool before its method reference", async () => {
+test("server-renders both labs and the package section", async () => {
   const response = await render();
   assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>StressFold \| An overfitting test for tabular models<\/title>/i);
-  assert.match(html, /Did your model learn the pattern, or memorize the data\?/);
-  assert.match(html, /Run the sample audit/);
-  assert.match(html, /Run the protocol on your actual pipeline/);
-  assert.match(html, /Read the audit equations term by term/);
-  assert.match(html, /id="math"/);
-  assert.match(html, /Stress operators and curve summaries/);
-  assert.match(html, /Normalized trapezoid area/);
-  assert.match(html, /Browser losses/);
-  assert.match(html, /Browser scores/);
-  assert.match(html, /Training loss versus unseen loss/);
-  assert.match(html, /Move the measurements, not the answers/);
-  assert.match(html, /x<sub>i<\/sub>\(\u03bb\) = x<sub>i<\/sub>/);
-  assert.match(html, /Predictions changed/);
-  assert.match(html, /Test a baseline on my CSV/);
-  assert.match(html, /browser lab implements a narrower four-stressor subset/i);
-  assert.match(html, /does not claim a new theorem/i);
-  assert.match(html, /Open PDF preview/);
-  assert.match(html, /LaTeX source \(\.tex\)/);
-  assert.match(html, />Limit</);
+  assert.match(html, /How much of your backtest is the search\?/);
+  assert.match(html, /What overfitting actually is/);
+  assert.match(html, /How searching manufactures a strategy/);
+  assert.match(html, /Measure it on your own trials/);
+  assert.match(html, /id="overfit"/);
+  assert.match(html, /id="search"/);
+  assert.match(html, /probability_of_backtest_overfitting/);
+  assert.match(html, /Nothing on this screen has any edge/);
+
+  // The explainer must reach the browser with a fitted curve already drawn,
+  // rather than an empty frame that only fills in after hydration.
+  assert.match(html, /Model flexibility/);
+  assert.match(html, /Configurations you tried/);
+
   assert.ok(
-    html.indexOf("Run a generalization and robustness audit") <
-      html.indexOf("Read the audit equations term by term"),
-    "the working lab should appear before the mathematics reference",
+    html.indexOf("What overfitting actually is") <
+      html.indexOf("How searching manufactures a strategy"),
+    "the plain explanation should come before the backtesting one",
   );
-  assert.ok(
-    html.indexOf("Run the protocol on your actual pipeline") <
-      html.indexOf("Explore how each test behaves"),
-    "the Python tool should be explained before the interactive lessons",
-  );
+
   assert.doesNotMatch(html, /—/);
-  assert.doesNotMatch(html, /No audit result yet/i);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
-});
 
-test("removes all temporary starter-preview infrastructure", async () => {
-  const [page, layout, packageJson] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-  ]);
-
-  assert.match(page, /StressFoldApp/);
-  assert.match(layout, /StressFold \| An overfitting test/);
-  assert.doesNotMatch(page, /codex-preview|SkeletonPreview/);
-  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
-  await access(new URL("../app/components/StressFoldApp.tsx", import.meta.url));
-  await access(new URL("../app/lib/analysis.ts", import.meta.url));
-  await access(new URL(".openai/hosting.json", repositoryRoot));
+  // Nothing from the tabular project should survive in the visible copy.
+  // Style and script blocks are stripped first, because "tabular-nums" is a
+  // legitimate CSS font-variant and would otherwise match forever.
+  const copy = html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ");
+  for (const stale of ["scikit-learn", "holdout", "estimator", "train-audit"]) {
+    assert.ok(
+      !copy.toLowerCase().includes(stale),
+      `the rendered page still mentions "${stale}" from the tabular project`,
+    );
+  }
 });

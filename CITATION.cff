@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use StressFold in research, please cite the software and record the version used."
-title: "StressFold: generalization stress tests for tabular models"
+title: "StressFold: measuring selection bias in backtested strategies"
 type: software
-version: 0.3.0
+version: 1.0.0
 date-released: 2026-07-30
 authors:
   - family-names: "Mirosenski"
