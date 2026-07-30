@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ._version import __version__
 from .config import AuditConfig, StressSuite
 from .metrics import METRICS, metric_degradation
 
@@ -283,7 +284,7 @@ class AuditResult:
         payload: dict[str, Any] = {
             "schema_version": "1.1",
             "created_at": self.created_at,
-            "package_version": "0.2.0",
+            "package_version": __version__,
             "scope": "i.i.d. tabular binary classification and regression",
             "interpretation": (
                 "StressFold estimates generalization gaps, refit stability, and sensitivity under the stated "

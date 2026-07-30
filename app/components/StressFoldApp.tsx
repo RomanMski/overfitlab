@@ -244,7 +244,7 @@ export function StressFoldApp() {
           <a href="#math">Mathematics</a>
           <a href="#paper">Paper</a>
         </nav>
-        <div className="header-status"><span /> v0.2.0 alpha</div>
+        <div className="header-status"><span /> v0.3.0 alpha</div>
       </header>
 
       <main id="top">
@@ -587,7 +587,7 @@ export function StressFoldApp() {
           </div>
           <div className="citation-block">
             <span>Suggested citation</span>
-            <code>Mirosenski, R. (2026). StressFold: generalization stress tests for tabular models. Version 0.2.0.</code>
+            <code>Mirosenski, R. (2026). StressFold: generalization stress tests for tabular models. Version 0.3.0.</code>
           </div>
         </section>
       </main>

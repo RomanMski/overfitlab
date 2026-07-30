@@ -32,7 +32,7 @@ In precise terms, StressFold is a local, deterministic audit for scikit-learn co
 
 The contribution is a synthesis and reproducible implementation of established validation ideas, plus controlled counterexamples showing why their outputs should not be collapsed into one score. StressFold does not claim a new statistical theorem.
 
-> Status: `0.2.0` is an alpha research release for binary classification and regression on tabular data.
+> Status: `0.3.0` is an alpha research release for binary classification and regression on tabular data.
 
 [Read the compiled methods paper](paper/main.pdf) or [open its LaTeX source](paper/main.tex).
 
@@ -43,8 +43,11 @@ The contribution is a synthesis and reproducible implementation of established v
 | Generalization | Does clean held-out performance deteriorate relative to training performance? | Paired train/audit scores over repeated holdouts |
 | Robustness | How does a fixed fitted model respond to a named evaluation-time perturbation? | Feature-noise and missingness response curves |
 | Falsification | Would the same fitting procedure look as successful after destroying the target association? | Label-permutation refits with a descriptive paired null-exceedance rate |
+| Selection | Was the tuned score earned, or produced by picking the best of many candidates? | A complete search rerun inside an outer holdout, inside every permutation, and on jittered replicas |
 
 Label-noise and reduced-training-set refits are reported separately as **training-stability diagnostics**. They do not turn robustness into evidence of generalization.
+
+The first three rows come from [`audit()`](#quick-start) and the fourth from [`audit_search()`](#auditing-a-hyperparameter-search).
 
 ```mermaid
 flowchart LR
@@ -160,6 +163,42 @@ stressfold sample.csv \
 
 Add `--quick` for a smaller protocol or `--export-variants` to retain the perturbed datasets.
 
+## Auditing a hyperparameter search
+
+`audit()` audits one already-fitted model. If you tuned that model, the score the tuning reported is not the score you have, because you picked the best of many candidates and that choice flatters itself:
+
+```python
+search = GridSearchCV(pipeline, param_grid, cv=5)   # 24 candidates
+search.fit(X, y)
+search.best_score_                                  # 0.58, and not trustworthy
+```
+
+`audit_search()` takes the search rather than the model, and reruns the whole thing many times:
+
+```python
+from sklearn.model_selection import GridSearchCV
+from stressfold import SearchAuditConfig, audit_search
+
+search = GridSearchCV(pipeline, param_grid, cv=4, scoring="roc_auc")
+report = audit_search(
+    search, X, y,
+    config=SearchAuditConfig(task="binary", random_state=7),
+)
+print(report.summary_text())
+```
+
+It reports three things separately.
+
+**Selection optimism.** The whole search is wrapped in an outer holdout it never sees, so you can compare the score the search reported to itself against the score its chosen configuration earns outside the search.
+
+**A selection-aware permutation null.** The complete search is rerun against shuffled targets, which tells you what a search of this size reaches when there is no signal at all. Holding the winner fixed and permuting around it instead would understate the null badly, and the paper measures that error at a 77.3% false-positive rate against a nominal 5%.
+
+**Winner stability.** The search is rerun on jittered copies of the table to see whether the same configuration keeps winning. When it does not, those specific settings are not uniquely justified and should not be reported as optimal. This says nothing about whether the score is real, since many configurations are often close to equivalent.
+
+[`examples/python/search_optimism.py`](examples/python/search_optimism.py) runs the same 24-candidate search twice, once on real signal and once on a target that is pure noise. `GridSearchCV` reports a score above chance for both. On the noise run the audit finds that shuffled-target searches reach a *higher* score than the one being reported.
+
+Two things to keep in mind. The audit refits the search roughly `outer_repeats + permutation_repeats + noise_repeats * levels` times, so start from `SearchAuditConfig.quick()` on anything large. And the smallest p-value reachable with `M` permutations is `1 / (M + 1)`, so 30 permutations cannot report anything below 0.032.
+
 ## Outputs
 
 An audit returns ordinary, inspectable pandas tables:
@@ -225,7 +264,7 @@ The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, 
 
 Use the repository’s [`CITATION.cff`](CITATION.cff) metadata or cite:
 
-> Mirosenski, R. (2026). *StressFold: generalization stress tests for tabular models*. Version 0.2.0. https://github.com/RomanMski/stressfold
+> Mirosenski, R. (2026). *StressFold: generalization stress tests for tabular models*. Version 0.3.0. https://github.com/RomanMski/stressfold
 
 Scientific and implementation contributions are welcome, and [`CONTRIBUTING.md`](CONTRIBUTING.md) describes the review expectations. Security reports belong in the private channel described in [`SECURITY.md`](SECURITY.md).
 

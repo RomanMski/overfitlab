@@ -8,6 +8,22 @@ All notable changes to StressFold will be documented here. The format follows [K
 
 - Broader split policies and domain-informed stress operators
 - Public benchmark cases with known failure modes
+- An HTML report for the search audit, which currently emits JSON and pandas frames only
+
+## [0.3.0] - 2026-07-30
+
+### Added
+
+- `audit_search()`, `SearchAuditConfig` and `SearchAuditResult`, which audit the hyperparameter search that produced a model rather than the fitted model alone
+- Selection optimism measurement, implementing the paper's `O_b` by wrapping a complete search in an outer holdout it never sees
+- A selection-aware permutation null that reruns the entire candidate search inside every permutation, which is the requirement the paper states for a valid permutation p-value
+- Winner stability measurement, which reruns the search on jittered copies of the table and records whether the selected configuration survives
+- `examples/python/search_optimism.py`, which runs one 24-candidate search over real signal and over pure noise and shows that shuffled-target searches can beat the score reported on noise
+
+### Changed
+
+- The paper no longer describes full-workflow permutation inference as unimplemented, because the search audit now satisfies its three stated requirements. Generator auditing and group- and time-aware splitting remain unimplemented and are still labelled as such.
+- The package version has a single source in `stressfold._version`, replacing three separately hardcoded copies in the package, the JSON artifact and the HTML footer
 
 ## [0.2.0] - 2026-07-30
 

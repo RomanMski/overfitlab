@@ -71,9 +71,37 @@ Default binary metrics are ROC AUC, log loss, and balanced accuracy. Available b
 
 Scenario failures are recorded rather than silently discarded. Inspect `result.errors` and the per-group `n` before interpreting a curve.
 
+## Auditing the search rather than the estimator
+
+`audit()` treats one fitted estimator as the unit under test. When that estimator was chosen by a hyperparameter search, the unit under test is the search, and `audit_search()` audits it. Three quantities are reported and none is combined with the others.
+
+**Selection optimism.** The complete search is refitted inside each outer holdout, so the search performs its own inner resampling on training rows only. The score it reports to itself is compared against the score its chosen configuration earns on the untouched outer fold:
+
+$$
+O_b = S^{\text{inner}}_b - S^{\text{outer}}_b .
+$$
+
+Positive $O_b$ means the search flattered itself. This is the paper's selection-optimism estimand written for a scorer where higher is better, so the sign convention matches the loss-scale definition rather than the arithmetic.
+
+**Selection-aware permutation null.** For permutation $m$ the dataset target is shuffled once, the entire candidate search is rerun, and that search's own best score $S^{\pi}_m$ becomes the single statistic for that permutation:
+
+$$
+p = \frac{1 + \sum_{m=1}^{M} \mathbb{1}\left(S^{\pi}_m \ge S^{\text{reported}}\right)}{M + 1}.
+$$
+
+Because selection is repeated inside every permutation, the null describes a search of this size rather than one fixed configuration. Holding the winner fixed and permuting around it instead inflates the false-positive rate severely, which the paper measures at 77.3% against a nominal 5%.
+
+Two properties of this p-value are worth stating plainly. Its smallest attainable value is $1/(M+1)$, so 30 permutations cannot report anything below 0.032. And a low value says the search found structure the shuffled null does not reach, which is not the same as saying the structure is causal, leak-free or stable.
+
+**Winner stability.** The search is rerun on copies of the table perturbed at graded noise levels, and the audit records how often the reported configuration wins again. Noise scales are calibrated on the supplied table rather than on a training fold, because the question is whether the search settles in the same place when the data moves, not how well the winner generalizes.
+
+Instability here constrains what you may claim about the configuration, not about the score. Many configurations are often close to equivalent, so a dataset with real signal can return a different winner on every run while its score stays sound. Report the score, and stop reporting the settings as optimal.
+
+The audit refits the supplied search roughly `outer_repeats + permutation_repeats + noise_repeats * (levels - 1)` times, so cost scales with the search rather than with the data. `SearchAuditConfig.quick()` exists for a first pass.
+
 ## Valid uses
 
-StressFold is useful for comparing complete estimators under one fixed protocol, finding abrupt sensitivity boundaries, checking whether apparent skill survives a simple null, and producing reproducible cases for deeper investigation.
+StressFold is useful for comparing complete estimators under one fixed protocol, finding abrupt sensitivity boundaries, checking whether apparent skill survives a simple null, auditing whether a tuned score survives its own selection, and producing reproducible cases for deeper investigation.
 
 Before using results for a decision:
 
