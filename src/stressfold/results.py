@@ -283,7 +283,7 @@ class AuditResult:
         payload: dict[str, Any] = {
             "schema_version": "1.1",
             "created_at": self.created_at,
-            "package_version": "0.1.0",
+            "package_version": "0.2.0",
             "scope": "i.i.d. tabular binary classification and regression",
             "interpretation": (
                 "StressFold estimates generalization gaps, refit stability, and sensitivity under the stated "

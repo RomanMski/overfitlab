@@ -19,9 +19,7 @@
 \definecolor{ink}{HTML}{20272E}
 \hypersetup{
   colorlinks=true,
-  linkcolor=stressblue,
-  citecolor=stressblue,
-  urlcolor=stressblue,
+  allcolors=black,
   pdfauthor={StressFold contributors},
   pdftitle={StressFold: Perturbation-response profiling for tabular model generalization}
 }
@@ -43,7 +41,7 @@
 \maketitle
 
 \begin{abstract}
-Overfitting is often reduced to a train-test gap, while robustness is reported as a second accuracy number and synthetic data are treated as additional evidence. Those quantities answer different questions. StressFold is a model-agnostic protocol for tabular classification and regression that keeps them separate. It estimates clean generalization under an explicit split policy, traces paired perturbation-response curves under declared measurement or distribution shifts, and runs falsification tests that repeat the complete learning workflow. Synthetic replicas are admitted only as audited stress instruments; they do not enlarge the effective sample size or substitute for real holdout observations. We specify estimands, leakage boundaries, perturbation operators, paired Monte Carlo aggregation, and generator diagnostics. Controlled experiments show three failure modes that a single score conceals: an interpolating tree with poor population loss can improve under randomized measurement noise; common perturbation draws materially reduce comparison variance; and replicas with accurate one-dimensional marginals can destroy class-conditional dependence and downstream utility. The protocol is implemented as a deterministic, local-first experiment specification and produces report-ready evidence rather than an ``overfit probability.''
+Overfitting is often reduced to a train-test gap, while robustness is reported as a second accuracy number and synthetic data are treated as additional evidence. Those quantities answer different questions. StressFold is a model-agnostic reference protocol for tabular classification and regression that keeps them separate, with bounded browser and Python implementations. It estimates clean generalization under an explicit split policy, traces paired perturbation-response curves under declared measurement or distribution shifts, and defines full-workflow falsification tests; the current implementations expose narrower descriptive null comparisons. Synthetic replicas are admitted only as audited stress instruments; they do not enlarge the effective sample size or substitute for real holdout observations. The reference protocol specifies estimands, leakage boundaries, perturbation operators, paired Monte Carlo aggregation, and generator diagnostics. Controlled experiments show three failure modes that a single score conceals: an interpolating tree with poor population loss can improve under randomized measurement noise; common perturbation draws materially reduce comparison variance; and replicas with accurate one-dimensional marginals can destroy class-conditional dependence and downstream utility. Deterministic, local-first implementations accompany the core split and perturbation workflow; broader permutation inference and generator auditing remain explicit extensions rather than current software claims.
 \end{abstract}
 
 \noindent\textbf{Keywords:} generalization, robustness, permutation tests, synthetic data, tabular learning, Monte Carlo.
@@ -56,6 +54,12 @@ StressFold is designed around a negative claim: no finite collection of resample
   \item \textbf{Robustness} estimates the change in risk under a named perturbation mechanism and severity scale.
   \item \textbf{Falsification} asks whether the entire observed workflow could produce its result under a specified null.
 \end{enumerate}
+
+\noindent\textbf{Contribution and non-claim.}
+The contribution is a synthesis and reproducible implementation of established validation ideas, together with controlled counterexamples that show why their outputs should not be collapsed into a single score. It is not a new statistical theorem, a universal test for overfitting, or a guarantee of performance under deployment shift.
+
+Release 0.2 implements repeated holdout, four stress operators, and descriptive null diagnostics. Full-workflow permutation inference, group- and time-aware splitting, and generator auditing remain reference-protocol components rather than current software claims.
+
 The distinctions are operational. Cross-validation estimates the performance of an algorithm trained on comparable unseen samples, not necessarily the conditional risk of the single final fit; fold-level standard errors can also be much too small \citep{bates2024crossvalidation}. Common-corruption benchmarks show why response curves are more informative than a single shifted test set \citep{hendrycks2019corruptions}, while natural-domain benchmarks show that convenient synthetic shifts are not replacements for real changes across time, sites, devices, or populations \citep{koh2021wilds}.
 
 The output is therefore a set of losses, paired differences, intervals, and explicit assumptions. It is not a composite traffic light. A model may generalize well on clean data yet be sensitive to measurement error; a highly adaptive model may fit random labels yet still exploit genuine structure \citep{zhang2017rethinking}; a generator may match marginals while omitting predictive dependence. Combining these outcomes would erase the information the audit is meant to expose.
@@ -72,6 +76,8 @@ Figure~\ref{fig:estimands} gives the central controlled example. The data-genera
 \end{figure*}
 
 This example also fixes the interpretation of a response curve. It is conditional on an operator, its units, its support constraints, and a label semantics. A curve can diagnose brittleness or accidental smoothing. It cannot identify the deployment distribution unless the operator is itself a credible model of that distribution.
+
+These simulations are constructive counterexamples under stated data-generating processes, not comparative benchmark evidence of general superiority.
 
 \section{Audit object and estimands}
 
@@ -213,7 +219,7 @@ Second, a permutation test must repeat selection. Under a pure null, 40 random b
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/paired_monte_carlo.pdf}
-  \caption{\textbf{Pairing improves precision; full-workflow permutation preserves the null.} (A) Sampling distributions of the depth-three minus depth-four loss contrast at severity \(\lambda=0.42\), using eight draws and a pool of 1,200 deterministic perturbations. (B) Estimator standard deviation over 900 Monte Carlo resamples at each \(R\). (C) Null false-positive rates for a selected random predictor when model choice is held fixed versus repeated inside every permutation.}
+  \caption{\textbf{Pairing improves precision; full-workflow permutation restores nominal calibration in this controlled simulation.} (A) Sampling distributions of the depth-three minus depth-four loss contrast at severity \(\lambda=0.42\), using eight draws and a pool of 1,200 deterministic perturbations. (B) Estimator standard deviation over 900 Monte Carlo resamples at each \(R\). (C) Null false-positive rates for a selected random predictor when model choice is held fixed versus repeated inside every permutation.}
   \label{fig:mc}
 \end{figure*}
 
@@ -223,7 +229,7 @@ Permutation evidence should remain modestly phrased. A low \(p\)-value says that
 
 A learned generator \(G(\train_b)\) is a random function of the same finite training sample. Its rows can expose local instability, probe constraints, or exercise software. They do not provide new information about unobserved modes of \(P\), and they cannot enlarge the effective sample size of a confidence interval. A diffusion generator such as TabDDPM can model heterogeneous tables \citep{kotelnikov2023tabddpm}, but model complexity does not alter this information boundary.
 
-StressFold therefore evaluates a generator along separate axes:
+The reference protocol therefore evaluates a generator along separate axes:
 \begin{itemize}
   \item \textbf{Fidelity:} held-out classifier two-sample testing (C2ST) \citep{lopezpaz2017c2st} and maximum mean discrepancy (MMD) with permutation calibration \citep{gretton2012mmd};
   \item \textbf{Coverage:} marginal, pairwise, subgroup, and target-conditional discrepancies, with precision/recall-style support diagnostics \citep{alaa2022faithful};
@@ -263,7 +269,7 @@ The empirical bootstrap has excellent utility and dependence fidelity but a 100\
 
 The reference experiment script, \texttt{scripts/reproduce\_paper.py}, is independent of the package API. It uses NumPy, SciPy, pandas-compatible CSV output, Matplotlib, and scikit-learn with a fixed root seed of 20260729 and single-threaded estimators. It regenerates every plotted PDF/PNG and both LaTeX/CSV tables. The DGP equations, sample sizes, replicate counts, model settings, and Monte Carlo schedules are encoded directly in that script.
 
-The current interfaces are bounded implementations of this reference protocol, not interchangeable embodiments of every equation above. Browser protocol 0.3 uses independent standardized numeric noise, a protected retained-skill denominator, and a tie-adjusted descriptive null rank. Python package 0.1 reports a pooled paired null-exceedance rate across repeated holdouts and does not call it a permutation $p$-value. Equation~\eqref{eq:permutation} requires coherent dataset-level permutations, a complete workflow rerun, and one prespecified aggregate statistic per permutation.
+The current interfaces are bounded implementations of this reference protocol, not interchangeable embodiments of every equation above. Browser protocol 0.3 uses independent standardized numeric noise, a protected retained-skill denominator, and a tie-adjusted descriptive null rank. Python package 0.2 reports a pooled paired null-exceedance rate across repeated holdouts and does not call it a permutation $p$-value. Equation~\eqref{eq:permutation} requires coherent dataset-level permutations, a complete workflow rerun, and one prespecified aggregate statistic per permutation.
 
 A production run should serialize more than an image: data and schema fingerprints; target and feature roles; constraints; exact split indices; estimator and preprocessing specifications; seed tree; perturbation parameters; rejected-row counts; software versions; and raw per-case/per-draw losses. Report generation is downstream of this immutable run record. A local-first browser interface can compute a bounded baseline directly, as the current lab does, or orchestrate a richer local Python audit. Deep generators are optional extras rather than browser dependencies.
 
@@ -285,7 +291,9 @@ The most valuable extensions are empirical rather than ornamental: block-aware o
 
 \section{Conclusion}
 
-StressFold turns an imprecise question--``is this model overfit?''--into auditable questions with different estimands. Clean outer assessment measures predictive generalization under a split policy. Perturbation-response curves measure sensitivity to named changes. Full-workflow permutation and random-label experiments falsify specific explanations. Synthetic replicas supply controlled probes only after their fidelity, dependence, copying, and utility have been audited.
+StressFold turns an imprecise question--``is this model overfit?''--into auditable questions with different estimands. Clean outer assessment measures predictive generalization under a split policy. Perturbation-response curves measure sensitivity to named changes. In the reference protocol, full-workflow permutation and random-label experiments test prespecified null and memorization hypotheses, while audited synthetic replicas can supply controlled probes.
+
+At release 0.2, the browser and Python interfaces implement the core clean and stress workflows with descriptive null controls; full-workflow permutation inference and generator auditing remain reference-protocol extensions.
 
 The controlled experiments show why the separation matters: clean population loss and noise response can move in opposite directions; paired Monte Carlo makes comparisons more precise; incomplete permutation invalidates inference; and good marginals can coexist with useless synthetic dependence. A restrained report of these facts is more scientifically useful than a universal score, and more reproducible than an opaque generator demo.
 

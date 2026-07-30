@@ -244,7 +244,7 @@ export function StressFoldApp() {
           <a href="#math">Mathematics</a>
           <a href="#paper">Paper</a>
         </nav>
-        <div className="header-status"><span /> v0.1.0 alpha</div>
+        <div className="header-status"><span /> v0.2.0 alpha</div>
       </header>
 
       <main id="top">
@@ -293,7 +293,7 @@ export function StressFoldApp() {
               <h2>Run a generalization and robustness audit.</h2>
             </div>
             <p>
-              The browser demonstrates the protocol with a transparent baseline model. The Python package applies the same tests to your own scikit-learn compatible pipeline.
+              The browser demonstrates the protocol with a transparent baseline model. The Python package runs related repeated-holdout diagnostics on your own scikit-learn compatible pipeline.
             </p>
           </div>
 
@@ -552,7 +552,7 @@ export function StressFoldApp() {
 
         <section className="method-section section-boundary" id="python">
           <div className="section-heading compact-heading">
-            <div><div className="eyebrow">Python library</div><h2>Run the same audit on your actual pipeline.</h2></div>
+            <div><div className="eyebrow">Python library</div><h2>Run the protocol on your actual pipeline.</h2></div>
             <p>The browser uses transparent baselines so every step is easy to inspect. The Python package accepts the estimator and preprocessing you actually use.</p>
           </div>
           <div className="scope-grid">
@@ -579,7 +579,7 @@ export function StressFoldApp() {
           <div className="paper-copy">
             <div className="eyebrow">Technical note</div>
             <h2>Perturbation-response profiling for tabular model generalization</h2>
-            <p>The paper defines the broader reference protocol and its claim boundaries. The browser lab implements a narrower four-stressor subset; the Mathematics section above gives its exact formulas.</p>
+            <p>The paper turns established validation ideas into one reproducible protocol and uses controlled counterexamples to show why their outputs must stay separate. It does not claim a new theorem. The browser lab implements a narrower four-stressor subset; the Mathematics section above gives its exact formulas.</p>
             <div className="paper-actions">
               <a className="button button-primary" href="/paper/stressfold.pdf" target="_blank" rel="noreferrer">Open PDF preview</a>
               <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">LaTeX source (.tex)</a>
@@ -587,7 +587,7 @@ export function StressFoldApp() {
           </div>
           <div className="citation-block">
             <span>Suggested citation</span>
-            <code>StressFold contributors (2026). StressFold: generalization stress tests for tabular models.</code>
+            <code>StressFold contributors (2026). StressFold: generalization stress tests for tabular models. Version 0.2.0.</code>
           </div>
         </section>
       </main>

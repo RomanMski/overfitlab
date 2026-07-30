@@ -4,6 +4,18 @@ All notable changes to StressFold will be documented here. The format follows [K
 
 ## [Unreleased]
 
+### Planned
+
+- Broader split policies and domain-informed stress operators
+- Public benchmark cases with known failure modes
+
+## [0.2.0] - 2026-07-30
+
+### Added
+
+- Interactive measurement-noise explainer with fixed clean positions, a fixed decision boundary, and live prediction-change counts
+- Explicit contribution, non-claim, and current-software boundary statements in the paper and project overview
+
 ### Changed
 
 - Replaced the pooled repeat-by-permutation `plus_one_p` field with a descriptive paired null-exceedance rate; overlapping holdouts are no longer presented as independent permutation evidence
@@ -15,11 +27,6 @@ All notable changes to StressFold will be documented here. The format follows [K
 - Withhold normalized stressor rankings when the clean baseline does not reliably outperform its constant reference
 - Block interpretation for repeated entity identifiers and near-perfect target proxies, while keeping repeated predictor patterns as a neutral review note
 - Reject browser uploads above 5,000 rows instead of silently analyzing only the first 5,000
-
-### Planned
-
-- Broader split policies and domain-informed stress operators
-- Public benchmark cases with known failure modes
 
 ## [0.1.0] - 2026-07-29
 

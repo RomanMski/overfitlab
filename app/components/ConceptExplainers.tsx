@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { correctedNullRank } from "../lib/analysis";
+import { NoiseInjectionLab } from "./NoiseInjectionLab";
 
 type SyntheticScenario = "marginals" | "structure" | "copies";
 
@@ -180,106 +181,6 @@ function OverfittingExplainer() {
           <i className="sf-learn-key sf-learn-key--unseen" aria-hidden="true" />
           Unseen loss <strong>{active.auditLoss.toFixed(3)}</strong>
         </span>
-      </div>
-    </ConceptFrame>
-  );
-}
-
-function NoiseInjectionExplainer() {
-  const [severity, setSeverity] = useState(35);
-  const basePoints = useMemo<Point[]>(
-    () =>
-      Array.from({ length: 22 }, (_, index) => {
-        const x = 7 + (index / 21) * 86;
-        return {
-          x,
-          y: clamp(0.86 - x / 125 + deterministicNoise(index, 2) * 0.045, 0.08, 0.92) * 100,
-        };
-      }),
-    [],
-  );
-  const noisyPoints = useMemo(
-    () =>
-      basePoints.map((point, index) => ({
-        x: clamp(
-          (point.x + deterministicNoise(index, 11) * severity * 0.28) / 100,
-          0.03,
-          0.97,
-        ) * 100,
-        y: point.y,
-      })),
-    [basePoints, severity],
-  );
-  const referenceLoss = 0.3;
-  const cleanLoss = 0.18;
-  const stressedLoss = cleanLoss + (severity / 100) * 0.09 + (severity / 100) ** 2 * 0.05;
-  const normalization = referenceLoss - cleanLoss;
-  const retainedSkill = 1 - (stressedLoss - cleanLoss) / normalization;
-
-  return (
-    <ConceptFrame
-      number="02"
-      eyebrow="Feature perturbation"
-      title="Adding noise to numeric inputs"
-      summary="We add measured errors to features, such as a noisy sensor or rounded value, without changing the hidden answer."
-      formula={
-        <>
-          R = 1 − (L<sub>stress</sub> − L<sub>clean</sub>) ÷ D = {retainedSkill.toFixed(2)}
-        </>
-      }
-      asks="Is the fitted model relying on a signal that collapses under small, plausible measurement errors?"
-      reads="Increase severity gradually. A gentle downward curve is ordinary; a cliff at low severity is a robustness warning worth investigating."
-      cannot="Sensitivity to noise is not, by itself, proof of overfitting. The perturbation may be unrealistic, or the real task may genuinely require precise measurements."
-    >
-      <div className="sf-learn-control">
-        <label htmlFor="sf-learn-noise">
-          Noise severity
-          <output htmlFor="sf-learn-noise">{severity}% of each feature&apos;s typical training spread</output>
-        </label>
-        <input
-          id="sf-learn-noise"
-          type="range"
-          min="0"
-          max="100"
-          step="5"
-          value={severity}
-          onChange={(event) => setSeverity(Number(event.target.value))}
-        />
-      </div>
-
-      <div
-        className="sf-learn-scatter"
-        role="img"
-        aria-label={`${basePoints.length} example observations before and after ${severity}% noise. The model retains ${asPercent(retainedSkill, 1)} of its clean skill.`}
-      >
-        <span className="sf-learn-scatter__ylabel" aria-hidden="true">
-          outcome
-        </span>
-        <div className="sf-learn-scatter__field" aria-hidden="true">
-          {basePoints.map((point, index) => (
-            <span
-              className="sf-learn-scatter__point sf-learn-scatter__point--clean"
-              key={`clean-${index}`}
-              style={{ left: `${point.x}%`, bottom: `${point.y}%` }}
-            />
-          ))}
-          {noisyPoints.map((point, index) => (
-            <span
-              className="sf-learn-scatter__point sf-learn-scatter__point--stressed"
-              key={`noise-${index}`}
-              style={{ left: `${point.x}%`, bottom: `${point.y}%` }}
-            />
-          ))}
-        </div>
-        <span className="sf-learn-scatter__xlabel" aria-hidden="true">
-          measured feature →
-        </span>
-      </div>
-
-      <div className="sf-learn-readout">
-        <span>Clean loss <strong>{cleanLoss.toFixed(3)}</strong></span>
-        <span>Stressed loss <strong>{stressedLoss.toFixed(3)}</strong></span>
-        <span>Performance retained <strong>{asPercent(retainedSkill, 1)}</strong></span>
       </div>
     </ConceptFrame>
   );
@@ -642,7 +543,7 @@ export function ConceptExplainers() {
 
       <div className="sf-learn__cards">
         <OverfittingExplainer />
-        <NoiseInjectionExplainer />
+        <NoiseInjectionLab />
         <MonteCarloExplainer />
         <LabelPermutationExplainer />
         <SyntheticDataExplainer />

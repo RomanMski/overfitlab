@@ -4,11 +4,11 @@
 
 StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train–audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
 
-The name compresses the protocol: controlled **stress** tests repeated across train and audit splits.
-
 It is an experimental instrument, not an overfitting detector and not a synthetic-data generator. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
 
-> Status: `0.1.0` is an alpha research release for binary classification and regression on tabular data.
+The contribution is a synthesis and reproducible implementation of established validation ideas, plus controlled counterexamples showing why their outputs should not be collapsed into one score. StressFold does not claim a new statistical theorem.
+
+> Status: `0.2.0` is an alpha research release for binary classification and regression on tabular data.
 
 [Read the compiled methods paper](paper/main.pdf) or [open its LaTeX source](paper/main.tex).
 
@@ -179,13 +179,13 @@ The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, 
 - Coherent dataset-level permutation inference for the complete repeated-holdout statistic
 - Domain-informed perturbation operators and comparison reports
 - A public benchmark suite with known failure modes
-- Conditional replica or diffusion models only after explicit fidelity, privacy, and downstream-utility gates; generated rows will remain stress instruments, never extra holdout evidence
+- Generator-audit hooks only after explicit fidelity, privacy, and downstream-utility gates; generated rows remain stress instruments, never holdout evidence
 
 ## Citation, contributing, and security
 
 Use the repository’s [`CITATION.cff`](CITATION.cff) metadata or cite:
 
-> StressFold contributors (2026). *StressFold: generalization stress tests for tabular models*. Version 0.1.0.
+> StressFold contributors (2026). *StressFold: generalization stress tests for tabular models*. Version 0.2.0.
 
 Scientific and implementation contributions are welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports belong in the private channel described in [`SECURITY.md`](SECURITY.md).
 

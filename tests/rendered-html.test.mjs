@@ -24,7 +24,7 @@ test("server-renders the StressFold tool before its method reference", async () 
   assert.match(html, /<title>StressFold \| Generalization stress tests for tabular models<\/title>/i);
   assert.match(html, /Test a model beyond its training data/);
   assert.match(html, /Run the sample audit/);
-  assert.match(html, /Run the same audit on your actual pipeline/);
+  assert.match(html, /Run the protocol on your actual pipeline/);
   assert.match(html, /Read the audit equations term by term/);
   assert.match(html, /id="math"/);
   assert.match(html, /Stress operators and curve summaries/);
@@ -32,8 +32,12 @@ test("server-renders the StressFold tool before its method reference", async () 
   assert.match(html, /Browser losses/);
   assert.match(html, /Browser scores/);
   assert.match(html, /Training loss versus unseen loss/);
+  assert.match(html, /Move the measurements, not the answers/);
+  assert.match(html, /x<sub>i<\/sub>\(\u03bb\) = x<sub>i<\/sub>/);
+  assert.match(html, /Predictions changed/);
   assert.match(html, /Test a baseline on my CSV/);
   assert.match(html, /browser lab implements a narrower four-stressor subset/i);
+  assert.match(html, /does not claim a new theorem/i);
   assert.match(html, /Open PDF preview/);
   assert.match(html, /LaTeX source \(\.tex\)/);
   assert.match(html, />Limit</);
@@ -43,7 +47,7 @@ test("server-renders the StressFold tool before its method reference", async () 
     "the working lab should appear before the mathematics reference",
   );
   assert.ok(
-    html.indexOf("Run the same audit on your actual pipeline") <
+    html.indexOf("Run the protocol on your actual pipeline") <
       html.indexOf("Explore how each test behaves"),
     "the Python tool should be explained before the interactive lessons",
   );

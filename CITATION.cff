@@ -2,18 +2,19 @@ cff-version: 1.2.0
 message: "If you use StressFold in research, please cite the software and record the version used."
 title: "StressFold: generalization stress tests for tabular models"
 type: software
-version: 0.1.0
-date-released: 2026-07-29
+version: 0.2.0
+date-released: 2026-07-30
 authors:
   - name: "StressFold contributors"
 abstract: >-
   StressFold is a deterministic, local-first protocol for measuring clean
   generalization gaps, perturbation-response curves, training stability, and
-  label-permutation nulls for tabular binary classification and regression.
+  descriptive label-permutation diagnostics for tabular binary classification
+  and regression.
 keywords:
   - generalization
   - robustness
   - overfitting
-  - permutation test
+  - permutation diagnostics
   - tabular machine learning
 license: MIT

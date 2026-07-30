@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-StressFold is pre-1.0 software. Security fixes are applied to the current `0.1.x` line and the default branch; older snapshots are not maintained.
+StressFold is pre-1.0 software. Security fixes are applied to the current `0.2.x` line and the default branch; older snapshots are not maintained.
 
 ## Reporting a vulnerability
 
