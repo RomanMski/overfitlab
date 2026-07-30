@@ -2,6 +2,8 @@
 
 **Generalization stress tests for tabular models.**
 
+![StressFold](docs/images/banner.jpg)
+
 StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train-audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
 
 It is an experimental instrument. It will not tell you whether a model is overfit, and it does not generate synthetic data. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
@@ -37,6 +39,22 @@ flowchart LR
 ```
 
 Perturbed and clean scores share the same split. StressFold reports raw metric values and a direction-normalized degradation, where positive always means worse. Its Monte Carlo bands are empirical quantiles across protocol repeats, so they should not be read as classical confidence intervals.
+
+## Controlled results
+
+Every figure below is regenerated from `scripts/reproduce_paper.py` at a fixed root seed of 20260729, using known data-generating processes rather than benchmark datasets. The script does not call the package API, so it works as an independent cross-check.
+
+![Generalization and robustness are distinct estimands](paper/figures/estimand_separation.png)
+
+Training loss falls to zero as the tree deepens, but population Brier loss is minimized at depth 2 (0.187) and degrades to 0.319 once the tree interpolates. Under correlated measurement noise the interpolating tree *improves*, while the depth-3 model loses skill. Robustness therefore cannot stand in for clean predictive risk, because here the two move in opposite directions.
+
+![Pairing improves precision and full-workflow permutation restores calibration](paper/figures/paired_monte_carlo.png)
+
+Giving every candidate model the same perturbation draws cuts simulation variance, and at R = 16 independent draws carry 1.83 times the estimator standard deviation of common draws. Panel C is the sharper warning. Selecting the best of 40 random predictors and then permuting labels around that fixed winner yields a 72.1% false-positive rate at a nominal 5%. Repeating the full 40-way selection inside every permutation brings it back to 5.7%.
+
+![Marginal fidelity does not imply predictive fidelity](paper/figures/synthetic_replica_audit.png)
+
+A generator that samples each feature independently within class reproduces the one-dimensional marginals almost exactly, with a mean class-conditional KS discrepancy of 0.059, and still destroys the dependence that carries the signal. Its real-holdout accuracy is 0.504, which is chance. This is why generated rows are treated as stress instruments and never as holdout evidence.
 
 ## Install
 

@@ -292,7 +292,7 @@ def plot_estimands(result: GeneralizationResult, output: Path) -> None:
     ax.text(
         0.0,
         1.015,
-        "Mean and 95% Monte Carlo interval; 54 training samples",
+        "Mean and 95% Monte Carlo interval over 54 training samples",
         transform=ax.transAxes,
         color=MUTED,
         fontsize=7.0,
@@ -338,7 +338,7 @@ def plot_estimands(result: GeneralizationResult, output: Path) -> None:
     ax.text(
         0.0,
         1.015,
-        "Paired measurement-noise draws; latent labels remain fixed",
+        "Paired measurement-noise draws, with latent labels held fixed",
         transform=ax.transAxes,
         color=MUTED,
         fontsize=7.0,
@@ -842,7 +842,7 @@ def write_summary_table(
         r"\toprule",
         r"Check & Deterministic result \\",
         r"\midrule",
-        "Generalization & Population Brier is minimized at depth {} ({:.3f}); the unpruned tree reaches {:.3f}. \\\\".format(
+        "Generalization & Population Brier is minimized at depth {} ({:.3f}), while the unpruned tree reaches {:.3f}. \\\\".format(
             generalization.depth_labels[best_idx],
             generalization.test_mean[best_idx],
             generalization.test_mean[unpruned_idx],
