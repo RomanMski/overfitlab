@@ -29,7 +29,7 @@ Nothing broke. You tried 500 configurations and kept the luckiest one, and the r
 
 ## What you get
 
-You bring a table and a model that is already trained. StressFold reports four things.
+You bring a table and a model specification, meaning an estimator or a pipeline. StressFold reports four things.
 
 1. How much worse the model does on rows it has never seen.
 2. How fast it degrades once the data gets noisy, loses values, carries wrong labels, or gets smaller.
@@ -38,19 +38,21 @@ You bring a table and a model that is already trained. StressFold reports four t
 
 All of it lands in one self-contained HTML report you can open in a browser, plus JSON and ordinary pandas tables.
 
+**What is actually under test.** The unit under test is your training procedure, not one saved model object. StressFold clones the estimator and refits it on the training rows of every split, so passing an already-fitted instance works but its learned state is discarded and relearned. That is deliberate, because refitting inside the split is what keeps preprocessing and selection from leaking across it. The estimand is therefore the risk of the procedure under the stated split policy, which is the quantity you care about when you retrain next quarter. If instead you need to certify one frozen model artifact, score it yourself on data this package never touches.
+
 > Status: `0.3.0` is an alpha research release for binary classification and regression on tabular data. [Read the compiled methods paper](paper/main.pdf) or [open its LaTeX source](paper/main.tex).
 
 ## How you run it
 
 There are three ways in, and only one of them tests a model you built yourself.
 
-| Entry point | You supply | Model under test | Use it for |
+| Entry point | You supply | Procedure under test | Use it for |
 | --- | --- | --- | --- |
 | Browser lab | a CSV file | a built-in baseline | seeing what the audit does, without writing code |
 | Command line | a CSV file | a built-in baseline | a fast first look at a file |
-| Python API | a CSV file and your own fitted pipeline | **yours** | auditing work you actually care about |
+| Python API | a CSV file and your own estimator or pipeline | **yours** | auditing work you actually care about |
 
-Nothing is uploaded and nothing is pasted into a box. The browser lab reads your CSV inside the page and never sends it anywhere. To audit your own model you import StressFold into the script where that model already lives, then hand the object straight to `audit()`.
+Nothing is uploaded and nothing is pasted into a box. The browser lab reads your CSV inside the page and never sends it anywhere. To audit your own model you import StressFold into the script where that model already lives, then hand the estimator straight to `audit()`.
 
 ## Install
 
@@ -134,7 +136,7 @@ Add `--quick` for a smaller protocol or `--export-variants` to retain the pertur
 
 ## Auditing a hyperparameter search
 
-`audit()` audits one already-fitted model. If you tuned that model, the score the tuning reported is not the score you have, for the reason at the top of this page. `audit_search()` takes the search itself rather than the fitted model:
+`audit()` audits one training procedure with its hyperparameters already chosen. If you chose them with a search, the score that search reported is not the score you have, for the reason at the top of this page. `audit_search()` takes the search itself rather than the fitted model:
 
 ```python
 from sklearn.model_selection import GridSearchCV

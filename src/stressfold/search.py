@@ -1,7 +1,8 @@
 """Selection-aware auditing of a hyperparameter search.
 
-``audit()`` audits one already-fitted estimator.  This module audits the
-*search* that produced it, which is where most reported optimism comes from.
+``audit()`` audits one training procedure whose hyperparameters are already
+fixed.  This module audits the *search* that chooses them, which is where most
+reported optimism comes from.
 A search reports the best score it found across many candidate configurations,
 and that best score is biased upward by the act of selecting it.
 
@@ -81,6 +82,7 @@ class SearchAuditConfig:
     permutation_repeats: int = 20
     noise_levels: tuple[float, ...] = (0.0, 0.1, 0.25, 0.5)
     noise_repeats: int = 3
+    selection_seed_repeats: int = 3
     verbose: bool = False
 
     def __post_init__(self) -> None:
@@ -96,6 +98,8 @@ class SearchAuditConfig:
             raise ValueError("permutation_repeats cannot be negative")
         if self.noise_repeats < 1:
             raise ValueError("noise_repeats must be at least 1")
+        if self.selection_seed_repeats < 0:
+            raise ValueError("selection_seed_repeats cannot be negative")
         if (
             isinstance(self.random_state, bool)
             or not isinstance(self.random_state, int)
@@ -119,6 +123,16 @@ class SearchAuditConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class _Reported:
+    """What the search claims for itself when fitted once on all rows."""
+
+    score: float
+    params: dict[str, Any]
+    key: str
+    n_candidates: int
+
+
+@dataclass(frozen=True, slots=True)
 class SearchAuditResult:
     """The outcome of a selection-aware search audit."""
 
@@ -132,6 +146,7 @@ class SearchAuditResult:
     optimism_records: tuple[dict[str, Any], ...]
     permutation_records: tuple[dict[str, Any], ...]
     stability_records: tuple[dict[str, Any], ...]
+    selection_noise_records: tuple[dict[str, Any], ...]
     config: dict[str, Any]
     seeds: dict[str, int]
     errors: tuple[str, ...] = field(default=())
@@ -152,6 +167,11 @@ class SearchAuditResult:
         """One row per perturbed rerun of the complete search."""
 
         return pd.DataFrame(list(self.stability_records))
+
+    def selection_noise_frame(self) -> pd.DataFrame:
+        """One row per reseeded rerun on the untouched table."""
+
+        return pd.DataFrame(list(self.selection_noise_records))
 
     # -- summaries ------------------------------------------------------
 
@@ -221,6 +241,27 @@ class SearchAuditResult:
             )
         return pd.DataFrame(rows)
 
+    def selection_noise_summary(self) -> dict[str, Any]:
+        """Report how far the winner moves on identical data, seed alone.
+
+        Read this before the stability curve. When the winner already moves
+        here, the estimator's own randomness is doing it, and any movement
+        under perturbation has to be judged against that floor.
+        """
+
+        frame = self.selection_noise_frame()
+        if frame.empty:
+            return {}
+        return {
+            "n_reseeds": int(len(frame)),
+            "kept_reported_winner": int(frame["matches_reported"].sum()),
+            "winner_retention_rate": float(frame["matches_reported"].mean()),
+            "distinct_winners": int(frame["params_key"].nunique()),
+            "score_spread": float(
+                frame["best_score"].max() - frame["best_score"].min()
+            ),
+        }
+
     def summary_text(self) -> str:
         """Return a short readable account of the three measurements."""
 
@@ -251,9 +292,26 @@ class SearchAuditResult:
                 f"  p-value                   {null['p_value']:.4f}"
                 f" ({null['exceedances']} of {null['n_permutations']} matched or beat it)",
             ]
+        reseed = self.selection_noise_summary()
+        if reseed:
+            lines += [
+                "",
+                "Selection randomness, same data and a different seed",
+                f"  kept the reported winner {reseed['kept_reported_winner']}"
+                f"/{reseed['n_reseeds']} times,"
+                f" {reseed['distinct_winners']} distinct winners",
+            ]
+            if reseed["winner_retention_rate"] < 1.0:
+                lines.append(
+                    "  the winner already moves without touching the data, so"
+                    " read the curve below against that"
+                )
         stability = self.stability_summary()
         if not stability.empty:
-            lines += ["", "Winner stability under feature noise"]
+            lines += [
+                "",
+                "Winner stability under feature noise, selection seed held fixed",
+            ]
             for row in stability.itertuples(index=False):
                 lines.append(
                     f"  level {row.level:<5} kept the reported winner"
@@ -282,6 +340,7 @@ class SearchAuditResult:
             "seeds": self.seeds,
             "selection_optimism": self.optimism_summary(),
             "permutation_null": self.permutation_summary(),
+            "selection_randomness": self.selection_noise_summary(),
             "winner_stability": self.stability_summary().to_dict(orient="records"),
             "records": {
                 "optimism": [_json_safe(record) for record in self.optimism_records],
@@ -289,6 +348,9 @@ class SearchAuditResult:
                     _json_safe(record) for record in self.permutation_records
                 ],
                 "stability": [_json_safe(record) for record in self.stability_records],
+                "selection_noise": [
+                    _json_safe(record) for record in self.selection_noise_records
+                ],
             },
             "errors": list(self.errors),
         }
@@ -400,17 +462,17 @@ def audit_search(
     metric_name = _scorer_name(scoring, search)
     errors: list[str] = []
 
-    seeds = {
-        "root": int(config.random_state),
-        "reported": derive_seed(config.random_state, "search", "reported"),
-    }
+    selection_seed = derive_seed(config.random_state, "search", "reported")
+    seeds = {"root": int(config.random_state), "selection": int(selection_seed)}
 
     _log(config, "fitting the search once on all rows to record what it reports")
-    reported = _fit_search(search, frame, target, seeds["reported"])
-    reported_score = float(reported.best_score_)
-    reported_params = dict(reported.best_params_)
-    reported_key = _params_key(reported_params)
-    n_candidates = _candidate_count(reported)
+    fitted = _fit_search(search, frame, target, selection_seed)
+    reported = _Reported(
+        score=float(fitted.best_score_),
+        params=dict(fitted.best_params_),
+        key=_params_key(dict(fitted.best_params_)),
+        n_candidates=_candidate_count(fitted),
+    )
 
     optimism_records = _measure_optimism(
         search, frame, target, config, scorer, errors
@@ -418,21 +480,25 @@ def audit_search(
     permutation_records = _measure_permutation_null(
         search, frame, target, config, errors
     )
+    selection_noise_records = _measure_selection_noise(
+        search, frame, target, config, reported, selection_seed, errors
+    )
     stability_records = _measure_stability(
-        search, frame, target, config, reported_key, errors
+        search, frame, target, config, reported, selection_seed, errors
     )
 
     return SearchAuditResult(
         task=config.task,
         metric=metric_name,
-        n_candidates=n_candidates,
+        n_candidates=reported.n_candidates,
         n_samples=int(len(frame)),
         n_features=int(frame.shape[1]),
-        reported_score=reported_score,
-        reported_params=reported_params,
+        reported_score=reported.score,
+        reported_params=reported.params,
         optimism_records=tuple(optimism_records),
         permutation_records=tuple(permutation_records),
         stability_records=tuple(stability_records),
+        selection_noise_records=tuple(selection_noise_records),
         config=config.to_dict(),
         seeds=seeds,
         errors=tuple(errors),
@@ -544,31 +610,54 @@ def _measure_stability(
     X: pd.DataFrame,
     y: pd.Series,
     config: SearchAuditConfig,
-    reported_key: str,
+    reported: _Reported,
+    selection_seed: int,
     errors: list[str],
 ) -> list[dict[str, Any]]:
     """Rerun the complete search on jittered copies of the table.
 
+    Every run reuses ``selection_seed``, so the only thing that changes between
+    the clean reference and a perturbed rerun is the data.  Letting the seed
+    move as well would mix data sensitivity with the estimator's own
+    randomness, and a search over ``random_state=None`` candidates would then
+    appear unstable at zero noise.  Algorithmic randomness is measured
+    separately by :func:`_measure_selection_noise`.
+
     Noise scales are calibrated on the supplied table rather than on a training
-    fold, because the question here is whether the search settles on the same
+    fold, because the question is whether the search settles on the same
     configuration when the data moves, not how well that configuration
     generalizes.
     """
 
     records: list[dict[str, Any]] = []
     for level in config.noise_levels:
-        repeats = 1 if level == 0.0 else config.noise_repeats
-        for index in range(repeats):
-            _log(config, f"winner stability, level {level}, run {index + 1}/{repeats}")
-            seed = derive_seed(config.random_state, "stability", level, index)
+        if level == 0.0:
+            # The reported fit already is the zero-noise run at this seed.
+            # Refitting it would only introduce the difference this function
+            # exists to exclude.
+            records.append(
+                {
+                    "level": 0.0,
+                    "run": 0,
+                    "seed": int(selection_seed),
+                    "best_score": reported.score,
+                    "best_params": dict(reported.params),
+                    "params_key": reported.key,
+                    "matches_reported": True,
+                }
+            )
+            continue
+        for index in range(config.noise_repeats):
+            _log(
+                config,
+                f"winner stability, level {level}, run {index + 1}/{config.noise_repeats}",
+            )
+            noise_seed = derive_seed(config.random_state, "stability-noise", level, index)
             try:
-                if level == 0.0:
-                    jittered = X
-                else:
-                    jittered = inject_feature_noise(
-                        X, level, X_train=X, random_state=seed
-                    ).data
-                fitted = _fit_search(search, jittered, y, seed)
+                jittered = inject_feature_noise(
+                    X, level, X_train=X, random_state=noise_seed
+                ).data
+                fitted = _fit_search(search, jittered, y, selection_seed)
             except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
                 errors.append(
                     f"stability level {level} run {index}: {type(exc).__name__}: {exc}"
@@ -580,11 +669,58 @@ def _measure_stability(
                 {
                     "level": float(level),
                     "run": int(index),
-                    "seed": int(seed),
+                    "seed": int(selection_seed),
+                    "noise_seed": int(noise_seed),
                     "best_score": float(fitted.best_score_),
                     "best_params": params,
                     "params_key": key,
-                    "matches_reported": bool(key == reported_key),
+                    "matches_reported": bool(key == reported.key),
                 }
             )
+    return records
+
+
+def _measure_selection_noise(
+    search: Any,
+    X: pd.DataFrame,
+    y: pd.Series,
+    config: SearchAuditConfig,
+    reported: _Reported,
+    selection_seed: int,
+    errors: list[str],
+) -> list[dict[str, Any]]:
+    """Refit the untouched table under different selection seeds.
+
+    This isolates the estimator's own randomness.  When a search samples
+    candidates at random, or an estimator carries ``random_state=None``, the
+    winning configuration can move without the data changing at all.  Reporting
+    that separately keeps it from being read as sensitivity to noise.
+    """
+
+    records: list[dict[str, Any]] = []
+    for index in range(config.selection_seed_repeats):
+        _log(
+            config,
+            f"selection randomness, reseed {index + 1}/{config.selection_seed_repeats}",
+        )
+        seed = derive_seed(config.random_state, "selection-seed", index)
+        if seed == selection_seed:
+            continue
+        try:
+            fitted = _fit_search(search, X, y, seed)
+        except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+            errors.append(f"selection reseed {index}: {type(exc).__name__}: {exc}")
+            continue
+        params = dict(fitted.best_params_)
+        key = _params_key(params)
+        records.append(
+            {
+                "reseed": int(index),
+                "seed": int(seed),
+                "best_score": float(fitted.best_score_),
+                "best_params": params,
+                "params_key": key,
+                "matches_reported": bool(key == reported.key),
+            }
+        )
     return records

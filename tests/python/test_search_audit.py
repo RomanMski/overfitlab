@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
@@ -139,6 +140,81 @@ def test_stability_reports_retention_and_counts_candidates():
     assert 0.0 <= jittered["winner_retention_rate"] <= 1.0
 
 
+def _unseeded_forest_search():
+    """A search whose estimator carries random_state=None.
+
+    The tree search used elsewhere hardcodes random_state=0, which hides any
+    confusion between data sensitivity and the estimator's own randomness.
+    """
+
+    return GridSearchCV(
+        RandomForestClassifier(n_estimators=25),
+        {"max_depth": [2, 3, None], "min_samples_leaf": [1, 4]},
+        cv=3,
+        scoring="roc_auc",
+    )
+
+
+def test_zero_noise_stability_is_not_disturbed_by_the_selection_seed():
+    """Regression test for a real defect.
+
+    The clean stability run used to be refitted under a freshly derived seed,
+    so an estimator with random_state=None could report a different winner at
+    zero noise even though the data was byte-identical. Every stability run now
+    reuses one selection seed, leaving the data as the only thing that varies.
+    """
+
+    X, y = _noise_table(seed=21)
+    result = audit_search(
+        _unseeded_forest_search(),
+        X,
+        y,
+        config=_quick(permutation_repeats=0, noise_levels=(0.0, 0.3)),
+    )
+    stability = result.stability_summary()
+    clean = stability.loc[stability["level"] == 0.0].iloc[0]
+
+    assert clean["winner_retention_rate"] == 1.0
+    assert clean["distinct_winners"] == 1
+    # Every perturbed run must share the clean run's selection seed.
+    frame = result.stability_frame()
+    assert frame["seed"].nunique() == 1
+
+
+def test_selection_randomness_is_reported_separately_from_noise():
+    """Seed-driven movement must not be charged to the noise operator."""
+
+    X, y = _noise_table(seed=22)
+    result = audit_search(
+        _unseeded_forest_search(),
+        X,
+        y,
+        config=_quick(
+            permutation_repeats=0, noise_levels=(0.0,), selection_seed_repeats=4
+        ),
+    )
+    reseed = result.selection_noise_summary()
+
+    assert reseed["n_reseeds"] == 4
+    # An unseeded forest search moves on identical data, and that belongs here
+    # rather than in the stability curve.
+    assert reseed["distinct_winners"] > 1
+    assert reseed["winner_retention_rate"] < 1.0
+    assert result.stability_summary().iloc[0]["winner_retention_rate"] == 1.0
+
+
+def test_selection_randomness_can_be_switched_off():
+    X, y = _signal_table(seed=23)
+    result = audit_search(
+        _tree_search(),
+        X,
+        y,
+        config=_quick(permutation_repeats=0, selection_seed_repeats=0),
+    )
+    assert result.selection_noise_summary() == {}
+    assert result.selection_noise_frame().empty
+
+
 def test_regression_task_is_supported():
     rng = np.random.default_rng(1)
     X = pd.DataFrame(rng.normal(size=(120, 4)), columns=list("abcd"))
@@ -175,6 +251,7 @@ def test_json_artifact_is_serialisable_and_complete(tmp_path):
     assert payload["selection_optimism"]["n_outer_splits"] == 3
     assert payload["permutation_null"]["n_permutations"] == 6
     assert payload["winner_stability"]
+    assert payload["selection_randomness"]["n_reseeds"] >= 1
     assert payload["config"]["task"] == "binary_classification"
     assert payload["seeds"]["root"] == 5
 

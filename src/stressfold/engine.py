@@ -204,10 +204,18 @@ def audit(
 ) -> AuditResult:
     """Run a paired, repeated stress audit of a tabular estimator.
 
-    Feature noise and missingness are evaluation-set robustness probes on the
-    fitted baseline model. Label noise and train-fraction paths refit the model
-    and therefore measure training stability. Permutations are a null control.
-    They are kept separate because none is, by itself, proof of overfitting.
+    The unit under test is the complete training procedure, not one saved
+    model object. ``estimator`` is cloned and refitted on the training rows of
+    every split, so an already-fitted instance has its learned state discarded
+    and relearned. That is what keeps preprocessing and selection inside the
+    audit rather than leaking across the split. To evaluate one frozen model
+    instead, score it yourself on data this function never sees.
+
+    Within a split the fitted model is then held fixed: feature noise and
+    missingness are evaluation-set robustness probes against it. Label noise
+    and train-fraction paths refit and therefore measure training stability.
+    Permutations are a null control. They are kept separate because none is,
+    by itself, proof of overfitting.
     """
 
     selected_suite = suite or StressSuite.standard()
