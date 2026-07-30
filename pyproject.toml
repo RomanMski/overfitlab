@@ -9,7 +9,7 @@ description = "Reproducible generalization stress tests for tabular models."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "StressFold contributors" }]
+authors = [{ name = "Roman Mirosenski" }]
 keywords = ["machine-learning", "overfitting", "robustness", "validation", "tabular"]
 classifiers = [
   "Development Status :: 3 - Alpha",

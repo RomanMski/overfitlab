@@ -8,10 +8,10 @@ StressFold is tested against datasets chosen to make failure visible, not only a
 | --- | --- | --- |
 | Strong linear classification | Held-out AUROC above 0.95 and clear separation from shuffled-label fits | Detects an ordinary recoverable signal |
 | Independent binary labels | Held-out AUROC remains near 0.5 and normalized stress rankings are withheld | A no-signal dataset must not receive a confident robustness ranking |
-| Strong linear regression | Held-out R² above 0.95; measurement noise lowers retained skill | Checks regression direction, loss normalization, and stress response |
+| Strong linear regression | Held-out R² above 0.95, and measurement noise lowers retained skill | Checks regression direction, loss normalization, and stress response |
 | XOR classification | A regularized linear model stays near chance while nearest neighbors exceed 0.85 AUROC | Demonstrates that the audit describes the supplied model, not an intrinsic property of the dataset |
 | Interaction regression | Linear and nearest-neighbor baselines diverge sharply | Exposes model dependence outside additive structure |
-| Imbalance and missing cells | Results remain finite; rare-class and imputation warnings are emitted | Exercises stratification and train-fold-only median imputation |
+| Imbalance and missing cells | Results remain finite, and rare-class and imputation warnings are emitted | Exercises stratification and train-fold-only median imputation |
 | One-row minority class | Browser audit is rejected before fitting | Repeated holdout evidence would otherwise be unusable |
 | Constant regression target | Browser audit is rejected before fitting | R² and retained-skill normalization are undefined without target variation |
 | Duplicate predictor patterns | A neutral review warning is shown without automatically blocking interpretation | Repeated patterns can be ordinary for discrete data and are not proof of leakage |

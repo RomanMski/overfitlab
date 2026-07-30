@@ -2,9 +2,9 @@
 
 **Generalization stress tests for tabular models.**
 
-StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train–audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
+StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train-audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
 
-It is an experimental instrument, not an overfitting detector and not a synthetic-data generator. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
+It is an experimental instrument. It will not tell you whether a model is overfit, and it does not generate synthetic data. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
 
 The contribution is a synthesis and reproducible implementation of established validation ideas, plus controlled counterexamples showing why their outputs should not be collapsed into one score. StressFold does not claim a new statistical theorem.
 
@@ -36,7 +36,7 @@ flowchart LR
     G --> H["HTML, JSON, tables, provenance"]
 ```
 
-Perturbed and clean scores share the same split. StressFold reports raw metric values and a direction-normalized degradation, where positive always means worse. Its Monte Carlo bands are empirical quantiles across protocol repeats; they are not classical confidence intervals.
+Perturbed and clean scores share the same split. StressFold reports raw metric values and a direction-normalized degradation, where positive always means worse. Its Monte Carlo bands are empirical quantiles across protocol repeats, so they should not be read as classical confidence intervals.
 
 ## Install
 
@@ -104,7 +104,7 @@ print(result.generalization_summary())
 print(result.permutation_summary())
 ```
 
-The complete runnable version is in [`examples/python/quickstart.py`](examples/python/quickstart.py); a regression example is in [`examples/python/regression_stability.py`](examples/python/regression_stability.py).
+The complete runnable version is in [`examples/python/quickstart.py`](examples/python/quickstart.py), and there is a regression example in [`examples/python/regression_stability.py`](examples/python/regression_stability.py).
 
 For a local CSV, the command-line interface supplies a leakage-safe preprocessing pipeline and a linear or tree baseline:
 
@@ -145,14 +145,14 @@ Each exported CSV has a manifest entry recording its source fingerprint, split, 
 
 ## Browser lab
 
-The repository includes a local browser lab for inspecting the protocol before writing model code. It accepts CSV files up to 5 MB and 5,000 data rows, runs binary-classification or regression audits over numeric predictors, and offers regularized linear/logistic and nearest-neighbor reference models. Files are parsed and analyzed in the browser; the current implementation does not upload the dataset. Larger tables are rejected rather than silently sampled.
+The repository includes a local browser lab for inspecting the protocol before writing model code. It accepts CSV files up to 5 MB and 5,000 data rows, runs binary-classification or regression audits over numeric predictors, and offers regularized linear/logistic and nearest-neighbor reference models. Files are parsed and analyzed in the browser, and the current implementation never uploads the dataset. Larger tables are rejected instead of being silently sampled.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-The lab exports a self-contained report, results JSON, and individual stress variants with manifests. It is deliberately narrower than the Python API and uses an independent browser implementation; do not expect bit-for-bit equivalence. See [`docs/browser-lab.md`](docs/browser-lab.md) for the boundary between exploratory and research use.
+The lab exports a self-contained report, results JSON, and individual stress variants with manifests. It is deliberately narrower than the Python API and runs on an independent browser implementation, so the two will not agree bit for bit. See [`docs/browser-lab.md`](docs/browser-lab.md) for the boundary between exploratory and research use.
 
 ## Interpretation and limitations
 
@@ -168,9 +168,9 @@ The exact estimands and operator definitions are in [`docs/methodology.md`](docs
 
 A root seed is expanded through a stable, semantic seed tree: split, model fit, stress operation, and permutation seeds are recorded by name. Adding an unrelated stressor does not renumber existing random streams. Zero-severity variants preserve the input exactly, and perturbation scales are estimated from the training fold only.
 
-For a stronger record, retain `results.json`, the source data under its normal access controls, the exact environment lock or package versions, and the code revision. A matching fingerprint detects changed values or schema; it does not recover the source data.
+For a stronger record, retain `results.json`, the source data under its normal access controls, the exact environment lock or package versions, and the code revision. A matching fingerprint detects changed values or schema, and it cannot recover the source data.
 
-The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, leakage boundaries, and controlled experiments. Its figures and tables are regenerated from fixed-seed scripts; build instructions are in [`paper/README.md`](paper/README.md).
+The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, leakage boundaries, and controlled experiments. Its figures and tables are regenerated from fixed-seed scripts, and build instructions are in [`paper/README.md`](paper/README.md).
 
 ## Roadmap
 
@@ -179,14 +179,14 @@ The technical paper in [`paper/main.tex`](paper/main.tex) states the estimands, 
 - Coherent dataset-level permutation inference for the complete repeated-holdout statistic
 - Domain-informed perturbation operators and comparison reports
 - A public benchmark suite with known failure modes
-- Generator-audit hooks only after explicit fidelity, privacy, and downstream-utility gates; generated rows remain stress instruments, never holdout evidence
+- Generator-audit hooks, gated behind explicit fidelity, privacy, and downstream-utility checks, with generated rows staying stress instruments and never becoming holdout evidence
 
 ## Citation, contributing, and security
 
 Use the repository’s [`CITATION.cff`](CITATION.cff) metadata or cite:
 
-> StressFold contributors (2026). *StressFold: generalization stress tests for tabular models*. Version 0.2.0.
+> Mirosenski, R. (2026). *StressFold: generalization stress tests for tabular models*. Version 0.2.0. https://github.com/RomanMski/stressfold
 
-Scientific and implementation contributions are welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports belong in the private channel described in [`SECURITY.md`](SECURITY.md).
+Scientific and implementation contributions are welcome, and [`CONTRIBUTING.md`](CONTRIBUTING.md) describes the review expectations. Security reports belong in the private channel described in [`SECURITY.md`](SECURITY.md).
 
 StressFold is released under the [MIT License](LICENSE).

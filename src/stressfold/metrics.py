@@ -130,7 +130,7 @@ def evaluate(
     metrics: Iterable[str],
     positive_label: Any | None = None,
 ) -> dict[str, float]:
-    """Evaluate natural-scale metrics; losses are not negated."""
+    """Evaluate natural-scale metrics, leaving losses un-negated."""
 
     y_array = np.asarray(y)
     values: dict[str, float] = {}

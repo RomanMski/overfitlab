@@ -34,7 +34,7 @@ const OPERATOR_COPY: Record<
     question: "What if some training labels are wrong?",
     method: "Binary labels flip at the chosen rate. Numeric targets receive scaled Gaussian noise. The model is refitted.",
     axis: "Training labels corrupted",
-    caveat: "A steep fall suggests a fragile fitting process; it is not an overfitting verdict on its own.",
+    caveat: "A steep fall suggests a fragile fitting process, and on its own it is not an overfitting verdict.",
   },
   missingness: {
     question: "What if evaluation inputs arrive incomplete?",

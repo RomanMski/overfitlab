@@ -10,11 +10,11 @@ We will act and interact in ways that contribute to an open, welcoming, diverse,
 
 Examples of behavior that supports this community include:
 
-- showing empathy and respect for different viewpoints and experiences;
-- giving and accepting constructive, technically specific feedback;
-- acknowledging mistakes and taking responsibility for their effects;
-- focusing on what is best for the project and its users; and
-- separating criticism of a method or claim from criticism of a person.
+- showing empathy and respect for different viewpoints and experiences
+- giving and accepting constructive, technically specific feedback
+- acknowledging mistakes and taking responsibility for their effects
+- focusing on what is best for the project and its users
+- separating criticism of a method or claim from criticism of a person
 
 Unacceptable behavior includes harassment, sexualized language or attention, insults, threats, deliberate intimidation, sustained disruption, publishing another person’s private information, or retaliation against a good-faith report.
 

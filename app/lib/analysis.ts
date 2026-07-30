@@ -719,9 +719,9 @@ function buildWarnings(
   percentile: number,
 ) {
   const warnings: string[] = [];
-  if (data.X.length < 200) warnings.push("Small sample: Monte Carlo bands may be wide; prefer the Python audit preset for decisions.");
+  if (data.X.length < 200) warnings.push("Small sample: Monte Carlo bands may be wide. Prefer the Python audit preset for decisions.");
   if (data.classBalance !== undefined && Math.min(data.classBalance, 1 - data.classBalance) < 0.12) {
-    warnings.push("Rare class: repeated splits can be unstable; consider grouped or nested evaluation.");
+    warnings.push("Rare class: repeated splits can be unstable. Consider grouped or nested evaluation.");
   }
   if (data.missingRate > 0.05) warnings.push(`${formatPercent(data.missingRate)} of numeric feature cells were median-imputed inside each training split.`);
   if (data.identifierColumns.length) {
@@ -731,16 +731,16 @@ function buildWarnings(
     warnings.push(`Unsupported non-numeric or sparse columns excluded: ${data.unsupportedColumns.join(", ")}. Browser results cover only the numeric predictors listed in the run context.`);
   }
   if (data.duplicateFeatureRate >= 0.02) {
-    warnings.push(`${formatPercent(data.duplicateFeatureRate)} of usable rows repeat an exact numeric predictor pattern. This can be ordinary for discrete data; if the rows are copies or repeated entities, use a group-aware split.`);
+    warnings.push(`${formatPercent(data.duplicateFeatureRate)} of usable rows repeat an exact numeric predictor pattern. This can be ordinary for discrete data. If the rows are copies or repeated entities, use a group-aware split.`);
   }
   if (data.repeatedEntity) {
-    warnings.push(`${data.repeatedEntity.column} repeats across ${formatPercent(data.repeatedEntity.rate)} of usable rows. Random row splits can place the same entity in training and audit data; use an entity-aware split.`);
+    warnings.push(`${data.repeatedEntity.column} repeats across ${formatPercent(data.repeatedEntity.rate)} of usable rows. Random row splits can place the same entity in training and audit data. Use an entity-aware split.`);
   }
   if (data.targetProxy) {
     warnings.push(`${data.targetProxy.feature} nearly determines the target by itself (${data.targetProxy.strength.toFixed(3)} univariate ${data.classBalance === undefined ? "absolute correlation" : "oriented AUROC"}). Check whether it is target-derived or unavailable at prediction time.`);
   }
   if (baseline.gap > Math.max(0.03, baseline.auditLoss * 0.3)) warnings.push("The train-audit loss gap is large relative to audit loss.");
-  if (!baseline.retainedSkillReliable) warnings.push("The clean baseline did not reliably beat a training-fold constant predictor. Its normalized retained-skill curves are unstable; inspect raw loss and model specification before ranking stressors.");
+  if (!baseline.retainedSkillReliable) warnings.push("The clean baseline did not reliably beat a training-fold constant predictor. Its normalized retained-skill curves are unstable, so inspect raw loss and model specification before ranking stressors.");
   if (percentile < 90) warnings.push("The observed score is not clearly separated from the label-permutation null in this quick run.");
   if (table.rows.length > data.X.length) warnings.push(`${table.rows.length - data.X.length} rows with missing targets were excluded.`);
   return warnings;

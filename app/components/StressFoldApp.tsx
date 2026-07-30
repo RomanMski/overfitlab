@@ -470,7 +470,7 @@ export function StressFoldApp() {
                     <Metric
                       label="Dependence on the split"
                       value={formatMetric(result.baseline.splitSpread)}
-                      note="5th to 95th percentile spread; smaller is steadier"
+                      note="5th to 95th percentile spread, where smaller is steadier"
                     />
                     <Metric
                       label="Real score versus shuffled median"
@@ -579,7 +579,7 @@ export function StressFoldApp() {
           <div className="paper-copy">
             <div className="eyebrow">Technical note</div>
             <h2>Perturbation-response profiling for tabular model generalization</h2>
-            <p>The paper turns established validation ideas into one reproducible protocol and uses controlled counterexamples to show why their outputs must stay separate. It does not claim a new theorem. The browser lab implements a narrower four-stressor subset; the Mathematics section above gives its exact formulas.</p>
+            <p>The paper turns established validation ideas into one reproducible protocol and uses controlled counterexamples to show why their outputs must stay separate. It does not claim a new theorem. The browser lab implements a narrower four-stressor subset, and the Mathematics section above gives its exact formulas.</p>
             <div className="paper-actions">
               <a className="button button-primary" href="/paper/stressfold.pdf" target="_blank" rel="noreferrer">Open PDF preview</a>
               <a className="button button-quiet" href="/paper/stressfold.tex" target="_blank" rel="noreferrer">LaTeX source (.tex)</a>
@@ -587,7 +587,7 @@ export function StressFoldApp() {
           </div>
           <div className="citation-block">
             <span>Suggested citation</span>
-            <code>StressFold contributors (2026). StressFold: generalization stress tests for tabular models. Version 0.2.0.</code>
+            <code>Mirosenski, R. (2026). StressFold: generalization stress tests for tabular models. Version 0.2.0.</code>
           </div>
         </section>
       </main>

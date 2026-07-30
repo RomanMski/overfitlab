@@ -322,7 +322,7 @@ const FORMULAS: FormulaDefinition[] = [
     },
     interpretation: "The median is the typical repeat. The 5th and 95th quantiles show the central spread produced by the declared split-and-seed procedure.",
     unusual: "A wide range signals split sensitivity. Identical endpoints may reflect stability, rounding, or too few distinct repeats. With small B, tail quantiles are coarse.",
-    boundary: "This is Monte Carlo variation under the protocol. The repeats reuse one finite dataset; they are not independent new samples. The range is not automatically a population confidence interval and omits untested shifts.",
+    boundary: "This is Monte Carlo variation under the protocol. The repeats reuse one finite dataset, so they are not independent new samples. The range is not automatically a population confidence interval, and it omits untested shifts.",
   },
   {
     id: "permutation",
@@ -390,7 +390,7 @@ const FORMULAS: FormulaDefinition[] = [
         id: "indicator",
         symbol: "I",
         name: "indicator function",
-        definition: "Returns 1 when its comparison is true and 0 otherwise. A strictly lower null score contributes 1; an exact tie contributes ½.",
+        definition: "Returns 1 when its comparison is true and 0 otherwise. A strictly lower null score contributes 1, and an exact tie contributes ½.",
       },
       {
         id: "correction",
@@ -497,7 +497,7 @@ function RemainingOperators() {
           </div>
           <dl>
             <div><dt>z_i</dt><dd>Binary draw deciding whether target i flips.</dd></div>
-            <div><dt>y_i, y′_i</dt><dd>Original and corrupted targets; binary y is 0 or 1.</dd></div>
+            <div><dt>y_i, y′_i</dt><dd>Original and corrupted targets, where binary y is 0 or 1.</dd></div>
             <div><dt>λ</dt><dd>Flip probability for classification or scaled-noise severity for regression.</dd></div>
             <div><dt>s_y</dt><dd>Training-only scale of a regression target.</dd></div>
             <div><dt>ε_i</dt><dd>Seeded zero-mean, unit-scale noise draw.</dd></div>
@@ -516,7 +516,7 @@ function RemainingOperators() {
             <div><dt>n</dt><dd>Available training rows before reduction.</dd></div>
             <div><dt>n_c</dt><dd>Available training rows in binary class c before reduction.</dd></div>
             <div><dt>λ</dt><dd>Fraction of training rows removed, from 0 to less than 1.</dd></div>
-            <div><dt>n′</dt><dd>Total rows retained. Classification samples each class separately; regression samples all rows together.</dd></div>
+            <div><dt>n′</dt><dd>Total rows retained. Classification samples each class separately, and regression samples all rows together.</dd></div>
             <div><dt>round</dt><dd>The declared nearest-integer rounding rule.</dd></div>
             <div><dt>clamp</dt><dd>Enforces at least two rows per class or eight regression rows, without exceeding those available.</dd></div>
           </dl>
@@ -531,7 +531,7 @@ function RemainingOperators() {
           </div>
           <dl>
             <div><dt>A</dt><dd>Normalized trapezoid area between the retained-performance curve and 1.</dd></div>
-            <div><dt>k</dt><dd>Index of a tested severity; k = 0 is the clean point and m is the last tested point.</dd></div>
+            <div><dt>k</dt><dd>Index of a tested severity, where k = 0 is the clean point and m is the last tested point.</dd></div>
             <div><dt>R_k</dt><dd>Median performance retained at tested severity λ_k.</dd></div>
             <div><dt>λ_m</dt><dd>Largest tested severity, used to normalize the horizontal scale.</dd></div>
             <div><dt>max</dt><dd>Truncates the summary at zero when the complete curve improves rather than degrades.</dd></div>
@@ -566,7 +566,7 @@ function RemainingOperators() {
           </div>
           <dl>
             <div><dt>AUROC</dt><dd>Probability that a random positive row ranks above a random negative row, with half credit for a tie.</dd></div>
-            <div><dt>R²</dt><dd>Regression improvement over predicting the audit-target mean. One is perfect; zero matches that mean benchmark.</dd></div>
+            <div><dt>R²</dt><dd>Regression improvement over predicting the audit-target mean. One is perfect, and zero matches that mean benchmark.</dd></div>
             <div><dt>P</dt><dd>Probability over positive and negative row pairs in the evaluated audit set.</dd></div>
             <div><dt>role</dt><dd>Scores drive the headline and permutation rank. Stress curves use Brier loss or MSE.</dd></div>
           </dl>

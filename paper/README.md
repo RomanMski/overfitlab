@@ -1,7 +1,7 @@
 # StressFold technical paper
 
 The paper is authored in `main.tex`. All numerical figures and tables are
-generated from fixed-seed controlled experiments; they do not call the
+generated from fixed-seed controlled experiments, and they do not call the
 StressFold package API.
 
 A compiled and visually checked copy is committed as `main.pdf`.

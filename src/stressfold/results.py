@@ -166,7 +166,7 @@ class AuditResult:
         return pd.DataFrame(grouped_rows, columns=columns)
 
     def generalization_frame(self) -> pd.DataFrame:
-        """Return paired clean train-to-test gaps; positive always means worse."""
+        """Return paired clean train-to-test gaps, where positive always means worse."""
 
         frame = self.records_frame()
         if frame.empty:

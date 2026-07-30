@@ -18,7 +18,7 @@ All notable changes to StressFold will be documented here. The format follows [K
 
 ### Changed
 
-- Replaced the pooled repeat-by-permutation `plus_one_p` field with a descriptive paired null-exceedance rate; overlapping holdouts are no longer presented as independent permutation evidence
+- Replaced the pooled repeat-by-permutation `plus_one_p` field with a descriptive paired null-exceedance rate, so overlapping holdouts are no longer presented as independent permutation evidence
 - Added tie-adjusted browser null ranks, minimum class-count and non-constant-target checks, and full-dataset provenance hashing
 - Bumped the exported JSON schema to `1.1` for the corrected permutation-summary fields
 

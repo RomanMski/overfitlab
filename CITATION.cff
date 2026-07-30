@@ -5,7 +5,11 @@ type: software
 version: 0.2.0
 date-released: 2026-07-30
 authors:
-  - name: "StressFold contributors"
+  - family-names: "Mirosenski"
+    given-names: "Roman"
+    alias: "RomanMski"
+repository-code: "https://github.com/RomanMski/stressfold"
+url: "https://github.com/RomanMski/stressfold"
 abstract: >-
   StressFold is a deterministic, local-first protocol for measuring clean
   generalization gaps, perturbation-response curves, training stability, and

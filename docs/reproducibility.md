@@ -6,8 +6,8 @@ StressFold records enough protocol state to rerun an audit and diagnose many acc
 
 `AuditConfig.random_state` is the root of a stable named seed tree. Child seeds are derived from semantic paths such as split index, operator, severity, model fit, and permutation index. This has two useful properties:
 
-- adding a new operator does not shift the random streams already assigned to other operators; and
-- every recorded score can be traced to a split seed, operation seed, and model seed.
+- adding a new operator does not shift the random streams already assigned to other operators
+- every recorded score can be traced back to a split seed, an operation seed, and a model seed
 
 StressFold fills `random_state=None` parameters on scikit-learn-compatible estimators and nested pipeline steps. Explicit estimator seeds are respected. Estimators that use hidden, external, multithreaded, or hardware-dependent randomness can still prevent exact replay.
 
@@ -25,16 +25,16 @@ A self-contained human-readable report with inline styles and figures. It includ
 
 The machine-readable audit object includes:
 
-- schema and package versions;
-- creation time and interpretation scope;
-- `AuditConfig` and `StressSuite` values;
-- input dimensions and fingerprint;
-- estimator representation;
-- complete named seed ledger;
-- scenario errors;
-- stress, generalization, and permutation summaries;
-- optional run-level records; and
-- optional variant manifest entries.
+- schema and package versions
+- creation time and interpretation scope
+- `AuditConfig` and `StressSuite` values
+- input dimensions and fingerprint
+- estimator representation
+- the complete named seed ledger
+- scenario errors
+- stress, generalization, and permutation summaries
+- run-level records, when retained
+- variant manifest entries, when exported
 
 Non-finite numeric values are serialized as `null`, not non-standard JSON tokens.
 

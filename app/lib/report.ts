@@ -41,7 +41,7 @@ export function buildHtmlReport(result: AuditResult): string {
 <body><main class="page">
   <div class="eyebrow">StressFold / generalization stress audit</div>
   <h1>${escapeHtml(result.dataset.name)}</h1>
-  <p class="lede">Controlled perturbation-response profiling with repeated paired splits. The report separates generalization, robustness, and falsification evidence; it does not claim to prove the absence or presence of overfitting.</p>
+  <p class="lede">Controlled perturbation-response profiling with repeated paired splits. The report separates generalization, robustness, and falsification evidence, and it does not claim to prove the absence or presence of overfitting.</p>
   <div class="meta">
     <span class="tag">${result.dataset.rows} rows</span>
     <span class="tag">${result.dataset.features.length} numeric features</span>

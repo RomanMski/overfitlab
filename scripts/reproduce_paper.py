@@ -106,7 +106,7 @@ def save_figure(fig: mpl.figure.Figure, path_without_suffix: Path) -> None:
         pad_inches=0.04,
         metadata={
             "Title": path_without_suffix.name,
-            "Author": "StressFold contributors",
+            "Author": "Roman Mirosenski",
             "Creator": "scripts/reproduce_paper.py",
             "CreationDate": None,
             "ModDate": None,

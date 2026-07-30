@@ -6,12 +6,12 @@ The browser lab is a local, bounded implementation of the StressFold idea. It is
 
 The lab:
 
-- accepts CSV files up to 5 MB and 5,000 data rows, rejecting larger tables rather than silently truncating them;
-- supports binary classification and numeric-target regression;
-- audits numeric predictors and reports ignored non-numeric or identifier-like columns;
-- offers a regularized linear/logistic reference model and a high-capacity nearest-neighbor comparison;
-- runs paired clean splits, fixed-model feature noise and missingness, label-noise refits, training-size refits, and a quick permutation null; and
-- exports a self-contained HTML report and results JSON.
+- accepts CSV files up to 5 MB and 5,000 data rows, and rejects larger tables instead of silently truncating them
+- supports binary classification and numeric-target regression
+- audits numeric predictors and reports any non-numeric or identifier-like columns it ignored
+- offers a regularized linear/logistic reference model and a high-capacity nearest-neighbor comparison
+- runs paired clean splits, fixed-model feature noise and missingness, label-noise refits, training-size refits, and a quick permutation null
+- exports a self-contained HTML report and results JSON
 
 Audit controls expose the target, task, estimator, repeat count, audit share, and seed. A deterministic sample dataset is included so the complete interface can be exercised without supplying data.
 

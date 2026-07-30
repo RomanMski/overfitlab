@@ -309,7 +309,7 @@ function LabelPermutationExplainer() {
         </>
       }
       asks="Can this pipeline still appear predictive after we deliberately remove the real signal it is supposed to learn?"
-      reads="For balanced yes or no data, shuffled AUROC should settle near 50%. The corrected percentile ranks the real score against all shuffled runs; exact ties receive half weight."
+      reads="For balanced yes or no data, shuffled AUROC should settle near 50%. The corrected percentile ranks the real score against all shuffled runs, and exact ties receive half weight."
       cannot="A passed permutation check does not prove the original relationship is causal, useful, or stable. It only shows this particular null check did not expose the pipeline."
     >
       <div className="sf-learn-permutation">

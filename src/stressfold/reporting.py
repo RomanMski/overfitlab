@@ -20,7 +20,7 @@ def _number(value: object) -> str:
     except (TypeError, ValueError):
         return escape(str(value))
     if not np.isfinite(numeric):
-        return "—"
+        return "n/a"
     if numeric == 0:
         return "0"
     if abs(numeric) >= 1_000 or abs(numeric) < 0.001:
@@ -201,8 +201,8 @@ section{{margin-top:60px}} .section-head{{display:flex;align-items:end;justify-c
 </style></head><body><main>
 <header><div><span class="eyebrow">Generalization stress report</span><h1>StressFold</h1><p class="lede">Controlled perturbations, refit experiments, and null checks for one tabular learning procedure.</p></div><p class="scope">This audit estimates performance under the stated resampling and perturbation protocol. It does not prove the absence of overfitting, causal validity, or robustness to arbitrary future shift.</p></header>
 <div class="stats"><div class="stat"><b>{result.n_samples:,}</b><span>rows</span></div><div class="stat"><b>{result.n_features:,}</b><span>features</span></div><div class="stat"><b>{result.config.repeats}</b><span>paired holdouts</span></div><div class="stat"><b>{len(result.variants):,}</b><span>captured variants</span></div></div>
-<section><div class="section-head"><div><span>Generalization evidence</span><h2>Clean train–test gap</h2></div></div><p class="note">Positive gap means test performance was worse than training performance, after respecting each metric’s direction.</p>{gap_table}</section>
-<section><div class="section-head"><div><span>Response paths</span><h2>Performance across severity</h2></div></div><p class="note">Lines show medians; shaded envelopes span the central {interval_percent}% of repeated runs. These are Monte Carlo variability intervals, not classical confidence intervals.</p><div class="charts">{"".join(charts)}</div></section>
+<section><div class="section-head"><div><span>Generalization evidence</span><h2>Clean train-test gap</h2></div></div><p class="note">Positive gap means test performance was worse than training performance, after respecting each metric’s direction.</p>{gap_table}</section>
+<section><div class="section-head"><div><span>Response paths</span><h2>Performance across severity</h2></div></div><p class="note">Lines show medians, and shaded envelopes span the central {interval_percent}% of repeated runs. These are Monte Carlo variability intervals, not classical confidence intervals.</p><div class="charts">{"".join(charts)}</div></section>
 <section><div class="section-head"><div><span>Paired effects</span><h2>Stress-test summary</h2></div></div>{stress_table}</section>
 <section><div class="section-head"><div><span>Falsification</span><h2>Permutation null</h2></div></div><p class="note">The paired exceedance rate is the descriptive fraction of shuffled-label fits that matched or exceeded their clean result on the same holdout. Repeated holdouts overlap, so this pooled rate is not a permutation p-value or an estimate of future error.</p>{permutation_table}</section>
 {errors}
