@@ -22,7 +22,7 @@ test("server-renders the StressFold tool before its method reference", async () 
 
   const html = await response.text();
   assert.match(html, /<title>StressFold \| Generalization stress tests for tabular models<\/title>/i);
-  assert.match(html, /Test a model beyond its training data/);
+  assert.match(html, /Did your model learn the signal, or memorize the rows\?/);
   assert.match(html, /Run the sample audit/);
   assert.match(html, /Run the protocol on your actual pipeline/);
   assert.match(html, /Read the audit equations term by term/);

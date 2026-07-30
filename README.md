@@ -1,12 +1,34 @@
 # StressFold
 
-**Generalization stress tests for tabular models.**
+**Check whether your model learned the signal or just memorized the rows.**
 
 ![StressFold](docs/images/banner.jpg)
 
-StressFold is a local, deterministic audit for scikit-learn-compatible estimators. It runs paired repeated holdouts, measures the clean train-audit gap, traces response curves under declared perturbations, and compares the supplied fitting pipeline with a label-permutation null.
+You bring a table of data and a model that is already trained. StressFold reports three things.
 
-It is an experimental instrument. It will not tell you whether a model is overfit, and it does not generate synthetic data. Every result is conditional on the split policy, metric, stress operator, and data supplied to the audit.
+1. How much worse the model does on rows it has never seen.
+2. How fast it falls apart once the data gets noisy, loses values, carries wrong labels, or gets smaller.
+3. Whether its apparent skill survives having the answers shuffled.
+
+All of it lands in one self-contained HTML report you can open in a browser.
+
+StressFold reports evidence and leaves the judgement to you. There is no single score and no pass or fail verdict, because those three findings can disagree with each other. A model can generalize well and still be fragile. Flattening that into one number hides the thing you wanted to know.
+
+## How you run it
+
+There are three ways in, and only one of them tests a model you built yourself.
+
+| Entry point | You supply | Model under test | Use it for |
+| --- | --- | --- | --- |
+| Browser lab | a CSV file | a built-in baseline | seeing what the audit does, without writing code |
+| Command line | a CSV file | a built-in baseline | a fast first look at a file |
+| Python API | a CSV file and your own fitted pipeline | **yours** | auditing work you actually care about |
+
+Nothing is uploaded and nothing is pasted into a box. The browser lab reads your CSV inside the page and never sends it anywhere. To audit your own model you import StressFold into the script where that model already lives, then hand the object straight to `audit()`. The [Quick start](#quick-start) below is the whole pattern.
+
+One thing StressFold does not do is invent training data. It can write out damaged copies of your own rows so you can see what the audit did to them, and those rows are probes rather than extra evidence. They cannot grow your sample and they cannot stand in for real holdout observations.
+
+In precise terms, StressFold is a local, deterministic audit for scikit-learn compatible estimators. It runs paired repeated holdouts, measures the clean train-audit gap, traces response curves under declared perturbations, and compares your fitting pipeline against a label-permutation null. Every result is conditional on the split policy, the metric, the stress operator, and the data you supplied.
 
 The contribution is a synthesis and reproducible implementation of established validation ideas, plus controlled counterexamples showing why their outputs should not be collapsed into one score. StressFold does not claim a new statistical theorem.
 

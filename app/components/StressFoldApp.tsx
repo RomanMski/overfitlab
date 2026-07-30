@@ -251,9 +251,9 @@ export function StressFoldApp() {
         <section className="hero section-boundary">
           <div className="hero-copy">
             <div className="kicker"><span>Generalization stress tests</span><span>Tabular models</span></div>
-            <h1>Test a model beyond its training data.</h1>
+            <h1>Did your model learn the signal, or memorize the rows?</h1>
             <p className="hero-lede">
-              StressFold measures the gap between training and unseen data. It then checks what happens under measurement noise, missing values, wrong labels, and smaller training sets.
+              StressFold measures how much worse a trained model does on rows it has never seen, how fast it degrades under noise, missing values, wrong labels and smaller training sets, and whether its skill survives having the answers shuffled. Load a CSV below to watch it happen on a built-in baseline, or use the Python package to audit your own pipeline.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="#lab">Open the browser lab <span aria-hidden="true">→</span></a>
@@ -293,7 +293,7 @@ export function StressFoldApp() {
               <h2>Run a generalization and robustness audit.</h2>
             </div>
             <p>
-              The browser demonstrates the protocol with a transparent baseline model. The Python package runs related repeated-holdout diagnostics on your own scikit-learn compatible pipeline.
+              This lab runs the audit on a built-in baseline model so you can see what it does without writing code. Your CSV stays in the page and is never uploaded. To audit a model you built yourself, use the Python package and pass your fitted pipeline straight to it.
             </p>
           </div>
 
