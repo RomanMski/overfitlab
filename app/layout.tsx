@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "StressFold | Generalization stress tests for tabular models";
+const title = "StressFold | An overfitting test for tabular models";
 const description =
-  "Test whether a tabular model generalizes under unseen rows, measurement noise, missing values, wrong labels, and smaller training sets.";
+  "Test a tabular model for overfitting. Measures how much worse it does on unseen data, how fast it degrades under noise, missing values, wrong labels and smaller training sets, and whether its skill survives a label shuffle.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();

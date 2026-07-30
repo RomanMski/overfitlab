@@ -250,10 +250,10 @@ export function StressFoldApp() {
       <main id="top">
         <section className="hero section-boundary">
           <div className="hero-copy">
-            <div className="kicker"><span>Generalization stress tests</span><span>Tabular models</span></div>
-            <h1>Did your model learn the signal, or memorize the rows?</h1>
+            <div className="kicker"><span>Overfitting tests</span><span>Tabular models</span></div>
+            <h1>Did your model learn the pattern, or memorize the data?</h1>
             <p className="hero-lede">
-              StressFold measures how much worse a trained model does on rows it has never seen, how fast it degrades under noise, missing values, wrong labels and smaller training sets, and whether its skill survives having the answers shuffled. Load a CSV below to watch it happen on a built-in baseline, or use the Python package to audit your own pipeline.
+              That question is what overfitting means, and StressFold answers it with evidence. It measures how much worse a trained model does on data it has never seen, how fast it degrades under noise, missing values, wrong labels and smaller training sets, and whether its skill survives having the answers shuffled. Load a CSV below to watch it happen on a built-in baseline, or use the Python package to audit your own pipeline.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="#lab">Open the browser lab <span aria-hidden="true">→</span></a>

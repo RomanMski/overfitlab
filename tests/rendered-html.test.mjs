@@ -21,8 +21,8 @@ test("server-renders the StressFold tool before its method reference", async () 
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>StressFold \| Generalization stress tests for tabular models<\/title>/i);
-  assert.match(html, /Did your model learn the signal, or memorize the rows\?/);
+  assert.match(html, /<title>StressFold \| An overfitting test for tabular models<\/title>/i);
+  assert.match(html, /Did your model learn the pattern, or memorize the data\?/);
   assert.match(html, /Run the sample audit/);
   assert.match(html, /Run the protocol on your actual pipeline/);
   assert.match(html, /Read the audit equations term by term/);
@@ -64,7 +64,7 @@ test("removes all temporary starter-preview infrastructure", async () => {
   ]);
 
   assert.match(page, /StressFoldApp/);
-  assert.match(layout, /StressFold \| Generalization stress tests/);
+  assert.match(layout, /StressFold \| An overfitting test/);
   assert.doesNotMatch(page, /codex-preview|SkeletonPreview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));

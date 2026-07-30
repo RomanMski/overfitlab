@@ -1,6 +1,6 @@
 # StressFold
 
-**Check whether your model learned the signal or just memorized the rows.**
+**An overfitting test for tabular models.** If that term is new to you, it means checking whether your model learned a real, general pattern, or whether it just memorized the specific examples it was trained on and will fall over on anything new.
 
 ![StressFold](docs/images/banner.jpg)
 
@@ -12,7 +12,7 @@ You bring a table of data and a model that is already trained. StressFold report
 
 All of it lands in one self-contained HTML report you can open in a browser.
 
-StressFold reports evidence and leaves the judgement to you. There is no single score and no pass or fail verdict, because those three findings can disagree with each other. A model can generalize well and still be fragile. Flattening that into one number hides the thing you wanted to know.
+StressFold reports evidence and leaves the judgement to you. It can show you that a model is overfitting. It cannot certify that a model is not, in the same way that a clean test result is never a promise of future health. There is no single score or pass and fail verdict either, because those three findings can disagree with each other. A model can generalize well on clean data and still be fragile, and flattening that into one number hides the thing you wanted to know.
 
 ## How you run it
 
