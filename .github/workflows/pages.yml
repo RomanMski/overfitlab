@@ -17,6 +17,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Set for every step. npm test runs its own build, so scoping this to a
+    # single step lets that rebuild silently replace the subpath build with a
+    # root one, which is what broke the first deploy.
+    env:
+      SITE_BASE_PATH: /overfitlab/
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -30,18 +35,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Build for the Pages subpath
-        run: npm run build
-        env:
-          SITE_BASE_PATH: /overfitlab/
-
       - name: Build and run browser checks
         run: npm test
 
       - name: Render the static site
         run: node scripts/prerender.mjs
-        env:
-          SITE_BASE_PATH: /overfitlab/
 
       - name: Upload the artifact
         uses: actions/upload-pages-artifact@v3
