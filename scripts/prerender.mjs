@@ -33,6 +33,13 @@ let html = await response.text();
 // specifically rather than rewriting URLs in general.
 if (base !== "/") {
   html = html.replace(/(href|src)="\/assets\//g, `$1="${base}assets/`);
+  // The same plugin also writes an inline @font-face block, where the paths
+  // sit in url(...) rather than in an attribute.
+  html = html.replace(/url\(\/assets\//g, `url(${base}assets/`);
+}
+
+if (base !== "/" && /url\(\/assets\//.test(html)) {
+  throw new Error("a font url() escaped the base and the page would load fallback type");
 }
 
 // Then assert, rather than trust, that nothing absolute escaped the base. A
