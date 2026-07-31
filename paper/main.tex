@@ -1,0 +1,112 @@
+% Regenerate the figure before compiling:
+%   py ../scripts/make_figures.py
+% Compile from this directory:
+%   tectonic -X compile main.tex
+\documentclass[11pt]{article}
+
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[font=small]{caption}
+\usepackage{microtype}
+\usepackage[round,authoryear]{natbib}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  allcolors=black,
+  pdfauthor={Roman Mirosenski},
+  pdftitle={How much of a backtest is the search},
+  pdfsubject={Selection bias and structure dependence in backtested strategies},
+  pdfkeywords={backtest overfitting, deflated Sharpe ratio, selection bias, block bootstrap}
+}
+
+\title{\textbf{How much of a backtest is the search?}\\[4pt]
+\large Selection bias and structure dependence in backtested strategies}
+\author{Roman Mirosenski\\[2pt]\small\texttt{github.com/RomanMski/overfitlab}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A backtest reports the best of everything you tried. That number is biased upward, and the size of the bias grows with how hard you searched. Two published corrections already exist for this, the deflated Sharpe ratio and the probability of backtest overfitting, and both are implemented here. Neither answers a second question that matters just as much: whether the market contains anything the strategy is reading. This paper describes a third measurement that does. The price history is resampled at a range of block lengths, from fully shuffled to almost intact, and the strategy is rerun on every resulting path. The resulting curve separates a timing edge, which dies when ordering is destroyed and returns as blocks lengthen, from a result that never depended on ordering at all. On a simulated market with genuine momentum a trend follower scores 1.00 annualised, falls to a median of 0.04 once returns are shuffled, and recovers to 1.00 at a block length of 60. Buy and hold on the same market scores 0.36 and scores 0.38 shuffled, because reordering cannot change a mean. All three measurements are packaged as an open library with a browser implementation that agrees with it to six decimal places.
+\end{abstract}
+
+\section{The problem}
+
+Suppose a moving-average crossover is swept over 200 parameter pairs and the best pair returns an annualised Sharpe ratio of 1.5. The number is arithmetically correct. It is also close to what the best of 200 strategies with no edge whatsoever would return, because the maximum of many noisy estimates is not an unbiased estimate of anything.
+
+This is not a subtle effect. Run the accompanying library on 60 return series drawn from independent normal noise, with a true Sharpe ratio of exactly zero in every column. The best of those 60 reports an annualised 1.29. The expected maximum given 60 trials is 1.37. The winner is below the bar, so the correct reading is that nothing was found, but 1.29 in isolation would pass most informal screening.
+
+Two published corrections address this directly. The deflated Sharpe ratio \citep{bailey2014deflated} computes the Sharpe ratio the best of $N$ trials is expected to reach under a null of no skill, then asks whether the observed maximum clears it. The probability of backtest overfitting \citep{bailey2016pbo} takes a different route: it splits the history into blocks, forms every balanced in-sample and out-of-sample partition, selects the best configuration in-sample, and records how often that selection lands below the median of its peers out-of-sample. Related work on data snooping \citep{white2000reality} and on the multiple-testing burden in published factors \citep{harvey2015backtesting} makes the same point from other directions.
+
+Both are implemented here and both are useful. Both also share a limitation. They ask whether your result is better than the search would produce by chance. Neither asks whether the market contained anything for the strategy to read in the first place.
+
+\section{Structure dependence}
+
+The second question has a natural experiment behind it. A strategy that times entries is claiming that the order in which returns arrived carries information. That claim can be tested by destroying the order and seeing what remains.
+
+Let $r_{1:T}$ be the observed return series and let $A$ be a strategy mapping a return series to the returns it would have earned on it. Let $B_\ell$ denote a resampling scheme with expected block length $\ell$, so that runs of about $\ell$ consecutive observations are preserved and only their arrangement changes. We use the stationary bootstrap of \citet{politis1994stationary}, whose geometric block lengths leave the resampled series stationary, unlike the fixed-length moving block scheme of \citet{kunsch1989jackknife}.
+
+At $\ell = 1$ the scheme reduces to independent resampling. Every autocorrelation, every volatility cluster, every trend is gone, while the marginal distribution of returns is untouched. At large $\ell$ almost all local structure survives.
+
+For each $\ell$ in a grid, draw $M$ paths and compute
+\[
+  S_\ell = \operatorname{median}_{m \le M}\ \mathrm{SR}\!\left(A\!\left(B_\ell^{(m)}(r_{1:T})\right)\right),
+\]
+alongside the observed $S_{\mathrm{obs}} = \mathrm{SR}(A(r_{1:T}))$. Reading $S_\ell$ across the grid is the diagnostic. We summarise its left end as
+\begin{equation}
+  D = 1 - \frac{S_{\ell=1}}{S_{\mathrm{obs}}},
+  \label{eq:dependence}
+\end{equation}
+which is near one when the result vanishes under shuffling and near zero when shuffling changes nothing.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{../docs/images/structure-sweep.png}
+  \caption{\textbf{Two strategies on one market.} Both are rerun on 300 resampled histories at each block length. The trend follower needs the ordering and collapses without it. Buy and hold is unaffected at every block length, because reordering a series cannot change its mean or its standard deviation. Dashed lines mark the result on the market that actually happened.}
+  \label{fig:sweep}
+\end{figure}
+
+\section{What the curve separates}
+
+Figure~\ref{fig:sweep} runs the sweep on a simulated market with mild genuine momentum, $r_t = 0.06\,r_{t-1} + \varepsilon_t + \mu$, and two strategies.
+
+The trend follower holds yesterday's direction. On the observed path it earns 1.00 annualised. At $\ell = 1$ the median across synthetic markets is 0.04 and the observed result exceeds every one of the 300 paths. As $\ell$ grows the synthetic markets regain the persistence the strategy trades, the median climbs to 0.75, 0.92 and 1.00, and the observed result stops being exceptional, beating only 50\% of paths at $\ell = 60$. Its structure dependence is $D = 0.96$.
+
+Buy and hold earns 0.36 on the observed path and between 0.33 and 0.39 at every block length, giving $D = -0.06$. This is not a failure of the method. It is the correct answer: buy and hold earns from drift, drift is a property of the marginal distribution, and resampling preserves the marginal distribution exactly. A flat curve is informative. It says the result does not depend on when anything happened, which for a strategy that claims to time the market would be damning.
+
+The recovery at large $\ell$ deserves emphasis, because it is easy to misread. A strategy scoring well on synthetic markets at $\ell = 60$ has not failed a test. Those markets contain the structure it exploits, by construction, so it should score well there. The evidence is the gradient, not any single level.
+
+\section{Implementation}
+
+The library implements all three measurements in Python over NumPy and SciPy, and a subset in TypeScript for the browser interface. The two implementations of the expected-maximum-Sharpe expression and the inverse normal CDF agree to six decimal places on identical input, which is asserted in the test suite against reference values from SciPy rather than against each other.
+
+Behaviour is tested rather than snapshotted. The suite asserts that independent resampling destroys autocorrelation while block resampling retains most of it, that a strategy with a genuine timing edge shows $D > 0.7$, and that a long-only strategy shows $D < 0.3$. Every generator is deterministic given a seed.
+
+\section{Limitations}
+
+\textbf{Exchangeable trials.} Both selection statistics assume the trials are roughly interchangeable draws. Searches that adapt, abandoning poor regions early, have an effective number of trials smaller than the number run, and both statistics will then be optimistic.
+
+\textbf{The overfitting probability ignores time order.} It draws combinations of blocks without regard to which came first. A strategy that worked until a regime changed and then stopped is invisible to it. This is a property of the published method and it is the main reason it is not reported alone here.
+
+\textbf{Volatility clustering survives only within blocks.} Real markets show persistence in volatility that outlives any practical block length, so the synthetic paths are calmer in the tails than the series they came from. A filtered resampling scheme that models conditional variance explicitly would improve this and is not implemented.
+
+\textbf{No transaction costs.} A strategy trading at daily frequency can lose most of a 1.00 Sharpe ratio to spread and slippage. None of these measurements will register that, and a structure-dependence result says nothing about whether the edge survives execution.
+
+\textbf{Simulation only.} The demonstrations use known data-generating processes so that the right answer is known in advance. That makes them clean counterexamples and not evidence about any real market.
+
+\section{Conclusion}
+
+The number a backtest reports is real. What it measures is partly how hard you looked. The deflated Sharpe ratio and the probability of backtest overfitting both quantify that, and both are worth computing before anything else.
+
+Neither tells you whether the market held anything to find. Destroying the ordering by degrees and rerunning the strategy does, and it separates two cases that a single Sharpe ratio cannot: a result that needs the arrangement of history, and one that would have happened in any arrangement.
+
+Passing all three is not evidence of an edge. It means selection alone does not explain the result, which is a much smaller claim, and the only one the arithmetic supports.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

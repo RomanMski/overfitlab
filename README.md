@@ -80,6 +80,11 @@ No transaction costs anywhere. A daily trend follower can lose most of a 1.00 Sh
 
 Passing everything is not evidence of an edge. It only means selection alone does not explain your result. That is a much smaller claim and it is the only one the maths supports.
 
+## The paper
+
+A short write-up of all three measurements, the argument for the block sweep,
+and the limits, is in [`paper/main.pdf`](paper/main.pdf).
+
 ## References
 
 Bailey and López de Prado (2014), *The Deflated Sharpe Ratio*. Bailey, Borwein, López de Prado and Zhu (2016), *The Probability of Backtest Overfitting*. Politis and Romano (1994), *The Stationary Bootstrap*.

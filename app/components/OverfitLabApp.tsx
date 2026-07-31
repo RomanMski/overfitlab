@@ -33,6 +33,8 @@ export function OverfitLabApp() {
                 See it happen <span aria-hidden="true">→</span>
               </a>
               <a className="button button-quiet" href="#test">Test your own backtest</a>
+              <a className="button button-quiet" href="./paper/overfitlab.pdf"
+                 target="_blank" rel="noreferrer">Read the paper</a>
             </div>
           </div>
         </section>
