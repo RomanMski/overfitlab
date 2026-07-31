@@ -12,7 +12,7 @@ async function render() {
   );
 }
 
-test("server-renders both labs and the package section", async () => {
+test("server-renders all four labs and the package section", async () => {
   const response = await render();
   assert.equal(response.status, 200);
 
@@ -20,7 +20,7 @@ test("server-renders both labs and the package section", async () => {
   assert.match(html, /How much of your backtest is the search\?/);
   assert.match(html, /What overfitting actually is/);
   assert.match(html, /How searching manufactures a strategy/);
-  assert.match(html, /Measure it on your own trials/);
+  assert.match(html, /Or from Python/);
   assert.match(html, /id="overfit"/);
   assert.match(html, /id="search"/);
   assert.match(html, /probability_of_backtest_overfitting/);
