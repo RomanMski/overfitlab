@@ -397,3 +397,141 @@ export function pathStress(
   }
   return { observedAnnualised: observed * annualiser, levels };
 }
+
+/* ---------------------------------------------------------------------------
+ * The two selection statistics, in the browser. Mirrors the Python package.
+ * ------------------------------------------------------------------------- */
+
+function combinations(items: number[], choose: number): number[][] {
+  const out: number[][] = [];
+  const current: number[] = [];
+  const walk = (start: number) => {
+    if (current.length === choose) {
+      out.push(current.slice());
+      return;
+    }
+    for (let i = start; i < items.length; i += 1) {
+      current.push(items[i]);
+      walk(i + 1);
+      current.pop();
+    }
+  };
+  walk(0);
+  return out;
+}
+
+export interface DeflatedResult {
+  observedSharpe: number;
+  observedAnnualised: number;
+  expectedMax: number;
+  expectedMaxAnnualised: number;
+  deflated: number;
+  nTrials: number;
+}
+
+/** Deflated Sharpe ratio for the best column of a trial matrix. */
+export function deflatedSharpe(
+  trials: number[][],
+  periodsPerYear = 252,
+): DeflatedResult {
+  const nTrials = trials.length;
+  const sharpes = trials.map(sharpe);
+  let bestIndex = 0;
+  for (let i = 1; i < nTrials; i += 1) {
+    if (sharpes[i] > sharpes[bestIndex]) bestIndex = i;
+  }
+  const observed = sharpes[bestIndex];
+  const variance = nTrials > 1 ? standardDeviation(sharpes) ** 2 : 0;
+  const expectedMax = expectedMaximumSharpe(nTrials, variance);
+  const best = trials[bestIndex];
+  const n = best.length;
+
+  // Probabilistic Sharpe ratio of the observed against the deflated benchmark,
+  // using the standard error that accounts for skew and kurtosis.
+  const m = mean(best);
+  const sd = standardDeviation(best);
+  let skew = 0;
+  let kurt = 0;
+  if (sd > 0) {
+    for (const value of best) {
+      skew += ((value - m) / sd) ** 3;
+      kurt += ((value - m) / sd) ** 4;
+    }
+    skew /= n;
+    kurt /= n;
+  }
+  const denominator = Math.sqrt(
+    Math.max(1 - skew * observed + ((kurt - 1) / 4) * observed * observed, 1e-12),
+  );
+  const statistic = ((observed - expectedMax) * Math.sqrt(n - 1)) / denominator;
+  const deflated = 0.5 * (1 + erf(statistic / Math.SQRT2));
+
+  const annualiser = Math.sqrt(periodsPerYear);
+  return {
+    observedSharpe: observed,
+    observedAnnualised: observed * annualiser,
+    expectedMax,
+    expectedMaxAnnualised: expectedMax * annualiser,
+    deflated,
+    nTrials,
+  };
+}
+
+/** Abramowitz and Stegun 7.1.26 error function. */
+export function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const z = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * z);
+  const y =
+    1 -
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-z * z);
+  return sign * y;
+}
+
+/** Probability of backtest overfitting by combinatorially symmetric CV. */
+export function probabilityOfBacktestOverfitting(
+  trials: number[][],
+  nSplits = 10,
+): { pbo: number; nCombinations: number } {
+  const nConfigs = trials.length;
+  const nPeriods = trials[0].length;
+  const splits = Math.max(2, nSplits - (nSplits % 2));
+  const size = Math.floor(nPeriods / splits);
+  const blocks: number[][] = [];
+  for (let i = 0; i < splits; i += 1) {
+    blocks.push(
+      Array.from({ length: size }, (_, k) => i * size + k),
+    );
+  }
+
+  const half = splits / 2;
+  const groups = combinations(
+    Array.from({ length: splits }, (_, i) => i),
+    half,
+  );
+
+  let below = 0;
+  for (const inSample of groups) {
+    const inSet = new Set(inSample);
+    const isIndex: number[] = [];
+    const oosIndex: number[] = [];
+    for (let b = 0; b < splits; b += 1) {
+      (inSet.has(b) ? isIndex : oosIndex).push(...blocks[b]);
+    }
+    const isScores = trials.map((col) => sharpe(isIndex.map((i) => col[i])));
+    const oosScores = trials.map((col) => sharpe(oosIndex.map((i) => col[i])));
+
+    let winner = 0;
+    for (let c = 1; c < nConfigs; c += 1) {
+      if (isScores[c] > isScores[winner]) winner = c;
+    }
+    // Where the in-sample winner ranks out of sample. Below the median means
+    // the selection did worse than picking at random would have.
+    const beaten = oosScores.filter((score) => score < oosScores[winner]).length;
+    if ((beaten + 1) / (nConfigs + 1) < 0.5) below += 1;
+  }
+  return { pbo: below / groups.length, nCombinations: groups.length };
+}

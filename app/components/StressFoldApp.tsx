@@ -3,6 +3,7 @@
 import { OverfitLab } from "./OverfitLab";
 import { PathLab } from "./PathLab";
 import { SearchLab } from "./SearchLab";
+import { TrialLab } from "./TrialLab";
 
 export function StressFoldApp() {
   return (
@@ -32,7 +33,7 @@ export function StressFoldApp() {
               <a className="button button-primary" href="#search">
                 See it happen <span aria-hidden="true">→</span>
               </a>
-              <a className="button button-quiet" href="#package">Use the package</a>
+              <a className="button button-quiet" href="#test">Test your own backtest</a>
             </div>
           </div>
         </section>
@@ -83,11 +84,26 @@ export function StressFoldApp() {
           <PathLab />
         </section>
 
+        <section className="lab-section" id="test">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">Test your own</div>
+              <h2>Run it on your backtest</h2>
+            </div>
+            <p>
+              Export the period returns of every configuration you tried, one
+              column each, and drop the file below. It is read in this page and
+              never leaves your machine.
+            </p>
+          </div>
+          <TrialLab />
+        </section>
+
         <section className="lab-section" id="package">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">Python package</div>
-              <h2>Measure it on your own trials</h2>
+              <div className="eyebrow">Package</div>
+              <h2>Or from Python</h2>
             </div>
             <p>
               Hand over a table of period returns with one column per configuration
