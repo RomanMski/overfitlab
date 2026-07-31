@@ -5,7 +5,7 @@
  * This reuses the same worker entry the tests exercise, so the HTML that ships
  * is the HTML the render test asserts against.
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 const root = new URL("../", import.meta.url);
 const clientDir = new URL("dist/client/", root);
@@ -53,6 +53,35 @@ const stray = [...html.matchAll(/(?:href|src)="(\/[^"]*)"/g)]
 if (stray.length > 0) {
   const list = stray.join("\n  ");
   throw new Error(`these URLs sit outside ${base} and would 404 once live:\n  ${list}`);
+}
+
+// The font plugin writes /assets/_vinext_fonts/... into whichever built file
+// carries the @font-face rule, and it ignores the base. Which file that is
+// differs by platform: on Windows the fonts inline as file:// paths and this
+// never appears, on Linux it lands in the emitted CSS. So sweep every built
+// text file rather than guessing which one. Missing this only costs the custom
+// typeface, but a 404 on a deployed site is still a defect.
+if (base !== "/") {
+  const needle = "/assets/_vinext_fonts/";
+  let patched = 0;
+
+  const sweep = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+      if (entry.isDirectory()) {
+        sweep(child);
+      } else if (/\.(css|js|html)$/.test(entry.name)) {
+        const body = readFileSync(child, "utf8");
+        if (body.includes(needle)) {
+          writeFileSync(child, body.replaceAll(needle, `${base}assets/_vinext_fonts/`), "utf8");
+          patched += 1;
+        }
+      }
+    }
+  };
+
+  sweep(clientDir);
+  console.log(`patched font paths in ${patched} built file(s)`);
 }
 
 writeFileSync(new URL("index.html", clientDir), html, "utf8");
