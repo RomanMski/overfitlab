@@ -1,92 +1,88 @@
 # StressFold
 
-**How much of your backtest is the search, and how much is the strategy?**
+**How much of your backtest is the search?**
 
-If you tried two hundred parameter combinations and reported the best one, the number you reported is not the number you have. This measures the difference.
-
-## The demonstration
-
-`examples/noise_that_looks_like_alpha.py` searches 200 configurations over data with **no signal in it at all**. Every series is a random walk, so no configuration is better than any other.
-
-The best one looks like this:
-
-```
-Sharpe 0.0840 per period, 1.33 annualised
-probability the Sharpe beats zero, ignoring the search: 0.996
-```
-
-An annualised Sharpe of 1.33, and a standard statistic is 99.6% confident it is real. The same trials with the search accounted for:
-
-```
-Deflated Sharpe ratio: 0.472
-  200 trials raise the bar to 0.0862 before any edge is credited
-  observed 0.0840 over 1000 observations
-
-Probability of backtest overfitting: 0.384
-  selected config averaged 0.120 in sample and -0.000 out of sample
-```
-
-The bar the winner had to clear was 0.0862. It reached 0.0840. Searching 200 things was worth more than the edge it found.
-
-## The interactive version
-
-`npm run dev` opens two labs that make the same point without any code.
-
-**What overfitting is.** A curve fitted to noisy dots, with a slider for how bendy it may be. Drag right and the error on the dots it was given keeps falling while the error on fresh data bottoms out and climbs. The gap between those two numbers is the overfitting.
-
-**How searching manufactures a strategy.** Five hundred equity curves, none with any edge. A slider for how many you are allowed to look at before picking the best. At one trial the winner shows an annualised Sharpe of 0.60. At five hundred it shows 1.54, and the bar for what luck alone reaches has risen to 1.70.
-
-## Using it on your own trials
+If you tried two hundred parameter combinations and reported the best one, the number you reported is not the number you have. Some of it is skill and some of it is the search. StressFold measures the difference.
 
 ```python
-from stressfold import (
-    deflated_sharpe_ratio,
-    probability_of_backtest_overfitting,
-)
+from stressfold import deflated_sharpe_ratio, path_stress
 
-# trials: (n_periods, n_configurations) of returns
+# trials: (n_periods, n_configurations) of returns, every configuration you tried
 print(deflated_sharpe_ratio(trials, periods_per_year=252))
-print(probability_of_backtest_overfitting(trials, n_splits=16))
+
+# and rerun the strategy on markets that never happened
+print(path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60)))
 ```
 
-A table of period-by-period returns, one column per configuration you backtested. The package never runs your strategy, never sees your data feed and never needs to know how your backtester works.
+## The problem
 
-Pass **every** configuration you evaluated. Dropping the ones that did badly is precisely the bias both statistics exist to measure.
+You sweep a moving-average crossover over 200 parameter pairs. The best one shows an annualised Sharpe of 1.5 and a clean equity curve.
 
-## The two measurements
+The catch is that the best of 200 random strategies also shows about 1.5. You did not find an edge, you ran a competition, and something always wins a competition.
 
-**Deflated Sharpe ratio.** A Sharpe from a finite sample is an estimate, and a biased one once you have taken the best of several trials. The deflation works out the Sharpe you would expect the winner to show when nothing has any edge, given how many things you tried and how much they varied, then asks whether the observed one clears that bar. It also corrects for skew, fat tails and sample length. Bailey and Lopez de Prado, 2014.
+Two searches can report the same number and mean completely different things. Nothing in a standard backtest report separates them.
 
-**Probability of backtest overfitting.** Cut the history into blocks, take every way of choosing half of them, find the configuration that wins on that half, and see where it ranks on the other. If the in-sample winner lands below the median of its peers about half the time, your selection procedure carries no information. Bailey, Borwein, Lopez de Prado and Zhu, 2016.
+## What it measures
 
-They answer different questions and are deliberately not combined into one score.
+**Did you search too hard?** The deflated Sharpe ratio works out what the best of N trials reaches when none of them has any edge, then asks whether yours clears that bar. The probability of backtest overfitting takes every way of cutting your history in half, finds the winner in one half, and measures how often it lands below the median of its peers in the other. Above 0.5 means your selection process is worse than picking at random.
 
-## What these cannot tell you
+**Is there anything there at all?** `path_stress` rebuilds your price history hundreds of times over and reruns your strategy on each one, destroying market structure by degrees:
 
-**PBO is blind to chronology.** CSCV enumerates every way of choosing half the blocks, and that set does not change when the blocks are relabelled, so the statistic is exactly invariant to the order of your history. A strategy that worked until some structural break and stopped will not be flagged, because a symmetric split averages the good and bad regimes on both sides. Detecting that needs walk-forward. A test in the suite asserts this invariance so it cannot regress quietly.
+| block size | what survives |
+| --- | --- |
+| 1 | nothing, returns drawn independently |
+| 5 | runs of 5 periods kept intact |
+| 20 | runs of 20 |
+| 60 | runs of 60 |
 
-**One PBO number is noisy.** Across independent datasets from the same null the estimate carries a standard deviation near 0.17 for a few dozen trials over several hundred periods. Treat 0.45 and 0.55 as the same answer.
+Reading that gradient tells you what the strategy depends on, not just whether it works. A real timing edge should die when ordering is destroyed and recover as the blocks lengthen. Here is a trend follower on a market with genuine momentum:
 
-**Neither is a profitability test.** No transaction costs, no slippage, no capacity, no market impact, no borrow.
+```
+  block  keeps                       median  the real result beats
+      1  nothing, pure noise           0.04   100.0% of them
+      5  runs of 5 periods             0.75    78.0%
+     20  runs of 20 periods            0.92    60.7%
+     60  runs of 60 periods            1.00    50.0%
 
-**Both assume your trial set is honest.** They measure selection bias given the number of trials you declare. Run 5,000 and pass 50, and the arithmetic will cheerfully under-correct.
+Structure dependence 0.96
+```
+
+Sharpe 1.00 on the real path, 0.04 once the ordering goes, back to 1.00 when the runs return. Buy and hold on the same market scores 0.36 and scores 0.38 shuffled, giving a structure dependence of **-0.06**, because reordering cannot change a mean. The sweep says plainly that none of that came from timing.
+
+## Interactive explainers
+
+The site runs three labs in the browser, no install and no data leaving the page.
+
+1. **What overfitting actually is.** A curve fitted to noisy points, with a flexibility slider. Watch the error on the fitted points fall to zero while the error on fresh points climbs.
+2. **How searching manufactures a strategy.** Five hundred strategies with no edge at all. Drag the number you are allowed to look at and watch the winner's Sharpe climb past anything you would call investable.
+3. **Markets that never happened.** The real market against synthetic ones, with the block-size sweep and a toggle between a trend follower and buy and hold.
+
+```bash
+npm ci && npm run dev
+```
 
 ## Install
 
 ```bash
-python -m pip install -e ".[dev]"
-python -m pytest        # 28 tests
-npm ci && npm test      # 13 tests, browser maths and rendering
+python -m pip install -e .
 ```
 
-Python 3.10 or newer, and Node 22.13 or newer for the labs.
+Python 3.10 or newer, with NumPy, pandas and SciPy.
+
+## Honest limits
+
+The two selection statistics assume your trials are roughly exchangeable. If you searched adaptively, stopping early on the bad ones, the effective number of trials is not the number you ran and both statistics will be optimistic.
+
+The probability of backtest overfitting is blind to time order. It draws combinations of blocks and does not care which came first, so it cannot see a strategy that worked until a regime changed and then stopped. That is a property of the published method, not a bug here, and it is why it is not the only thing reported.
+
+Resampling preserves volatility clustering only within blocks. Real markets have persistence that outlives that, so the synthetic paths are tamer than reality in the tails.
+
+Nothing here models transaction costs. A strategy that trades daily can lose most of its measured edge to spread and slippage, and none of these statistics will notice.
+
+Passing every check is not evidence of an edge. It means selection alone does not explain your result, which is a much weaker claim and the only one the maths supports.
 
 ## References
 
-Bailey, D. and Lopez de Prado, M. (2012). The Sharpe Ratio Efficient Frontier. *Journal of Risk*.
-
-Bailey, D. and Lopez de Prado, M. (2014). The Deflated Sharpe Ratio. *Journal of Portfolio Management*.
-
-Bailey, D., Borwein, J., Lopez de Prado, M. and Zhu, Q. (2016). The Probability of Backtest Overfitting. *Journal of Computational Finance*.
+Bailey and López de Prado (2014), *The Deflated Sharpe Ratio*. Bailey, Borwein, López de Prado and Zhu (2016), *The Probability of Backtest Overfitting*. Politis and Romano (1994), *The Stationary Bootstrap*.
 
 MIT licensed.
