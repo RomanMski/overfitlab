@@ -1,6 +1,6 @@
-# Contributing to StressFold
+# Contributing to OverfitLab
 
-StressFold is small enough that a focused pull request can materially improve it. Contributions are welcome in four areas: statistical method, Python implementation, browser instrumentation, and reproducible examples.
+OverfitLab is small enough that a focused pull request can materially improve it. Contributions are welcome in four areas: statistical method, Python implementation, browser instrumentation, and reproducible examples.
 
 ## Before changing the method
 

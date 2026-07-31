@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy.stats import norm
 
-from stressfold import (
+from overfitlab import (
     deflated_sharpe_ratio,
     expected_maximum_sharpe,
     probabilistic_sharpe_ratio,

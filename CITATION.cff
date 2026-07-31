@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "If you use StressFold in research, please cite the software and record the version used."
-title: "StressFold: measuring selection bias in backtested strategies"
+message: "If you use OverfitLab in research, please cite the software and record the version used."
+title: "OverfitLab: measuring selection bias in backtested strategies"
 type: software
 version: 1.0.0
 date-released: 2026-07-30
@@ -8,10 +8,10 @@ authors:
   - family-names: "Mirosenski"
     given-names: "Roman"
     alias: "RomanMski"
-repository-code: "https://github.com/RomanMski/stressfold"
-url: "https://github.com/RomanMski/stressfold"
+repository-code: "https://github.com/RomanMski/overfitlab"
+url: "https://github.com/RomanMski/overfitlab"
 abstract: >-
-  StressFold measures how much of a backtested result came from searching a
+  OverfitLab measures how much of a backtested result came from searching a
   parameter space rather than from skill. It reports a deflated Sharpe ratio,
   the probability of backtest overfitting, and a sweep that reruns a strategy
   on resampled price histories to show what market structure the result

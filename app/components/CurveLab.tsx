@@ -28,7 +28,7 @@ function path(points: [number, number][]): string {
     .join(" ");
 }
 
-export function OverfitLab() {
+export function CurveLab() {
   const [degree, setDegree] = useState(3);
   const [seed, setSeed] = useState(7);
   const data = useMemo(() => sampleOverfitData(seed), [seed]);

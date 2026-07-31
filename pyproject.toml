@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stressfold"
+name = "overfitlab"
 version = "1.0.0"
 description = "Measure how much of a backtest result came from searching rather than from skill."
 readme = "README.md"
@@ -38,11 +38,11 @@ where = ["src"]
 testpaths = ["tests/python"]
 addopts = "-ra --strict-config --strict-markers"
 filterwarnings = [
-  "error::FutureWarning:stressfold.*",
+  "error::FutureWarning:overfitlab.*",
 ]
 
 [tool.coverage.run]
-source = ["stressfold"]
+source = ["overfitlab"]
 branch = true
 
 [tool.coverage.report]

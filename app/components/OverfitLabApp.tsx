@@ -1,17 +1,17 @@
 "use client";
 
-import { OverfitLab } from "./OverfitLab";
+import { CurveLab } from "./CurveLab";
 import { PathLab } from "./PathLab";
 import { SearchLab } from "./SearchLab";
 import { TrialLab } from "./TrialLab";
 
-export function StressFoldApp() {
+export function OverfitLabApp() {
   return (
     <div className="page">
       <header className="site-header">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>StressFold</span>
+          <span>OverfitLab</span>
         </div>
         <div className="header-status"><span /> v1.0.0</div>
       </header>
@@ -25,7 +25,7 @@ export function StressFoldApp() {
             <h1>How much of your backtest is the search?</h1>
             <p className="hero-lede">
               If you tried two hundred parameter combinations and reported the best
-              one, the number you reported is not the number you have. StressFold
+              one, the number you reported is not the number you have. OverfitLab
               measures the difference. The three labs below show why it matters, and
               the Python package measures it on your own trials.
             </p>
@@ -50,7 +50,7 @@ export function StressFoldApp() {
               allowed to be.
             </p>
           </div>
-          <OverfitLab />
+          <CurveLab />
         </section>
 
         <section className="lab-section" id="search">
@@ -111,7 +111,7 @@ export function StressFoldApp() {
               your data feed.
             </p>
           </div>
-          <pre className="code-block"><code>{`from stressfold import (
+          <pre className="code-block"><code>{`from overfitlab import (
     deflated_sharpe_ratio,
     path_stress,
     probability_of_backtest_overfitting,
@@ -140,7 +140,7 @@ print(path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60)))`}</code
       <footer className="site-footer">
         <div className="brand footer-brand">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>StressFold</span>
+          <span>OverfitLab</span>
         </div>
         <p>Selection bias in backtests, measured rather than assumed.</p>
       </footer>

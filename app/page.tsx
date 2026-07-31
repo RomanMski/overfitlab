@@ -1,5 +1,5 @@
-import { StressFoldApp } from "./components/StressFoldApp";
+import { OverfitLabApp } from "./components/OverfitLabApp";
 
 export default function Home() {
-  return <StressFoldApp />;
+  return <OverfitLabApp />;
 }

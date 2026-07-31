@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "StressFold | How much of your backtest is the search?";
+const title = "OverfitLab | How much of your backtest is the search?";
 const description =
   "Measure how much of a backtest result came from searching rather than from skill. Deflated Sharpe ratio and probability of backtest overfitting, over the trials you already ran.";
 

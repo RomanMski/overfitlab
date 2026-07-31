@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to StressFold are documented here, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+All notable changes to OverfitLab are documented here, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.0.0] - 2026-07-30
 

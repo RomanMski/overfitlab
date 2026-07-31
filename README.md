@@ -1,15 +1,15 @@
-# StressFold
+# OverfitLab
 
 **How much of your backtest is the search?**
 
-If you tried two hundred parameter combinations and reported the best one, the number you reported is not the number you have. Some of it is skill and some of it is the search. StressFold measures the difference.
+If you tried two hundred parameter combinations and reported the best one, the number you reported is not the number you have. Some of it is skill and some of it is the search. OverfitLab measures the difference.
 
 ![Destroy the market's ordering and see what survives](docs/images/structure-sweep.png)
 
 Two strategies on the same market. Both were rerun on hundreds of resampled histories, with less and less of the original ordering left intact. The trend follower needs that ordering and collapses without it. Buy and hold does not notice, because reordering returns cannot change their mean. `scripts/make_figures.py` regenerates this.
 
 ```python
-from stressfold import deflated_sharpe_ratio, path_stress
+from overfitlab import deflated_sharpe_ratio, path_stress
 
 # trials: (n_periods, n_configurations) of returns, every configuration you tried
 print(deflated_sharpe_ratio(trials, periods_per_year=252))

@@ -30,4 +30,4 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run test suite
-        run: python -m pytest --cov=stressfold --cov-report=term-missing
+        run: python -m pytest --cov=overfitlab --cov-report=term-missing

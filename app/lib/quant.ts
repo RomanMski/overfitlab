@@ -305,7 +305,7 @@ export function searchSnapshot(
 }
 
 /* ---------------------------------------------------------------------------
- * Alternative histories. Mirrors stressfold.synthetic.
+ * Alternative histories. Mirrors overfitlab.synthetic.
  * Resampling with longer blocks keeps more ordering intact, so sweeping the
  * block length destroys market structure by degrees.
  * ------------------------------------------------------------------------- */

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from stressfold import (
+from overfitlab import (
     deflated_sharpe_ratio,
     probabilistic_sharpe_ratio,
     probability_of_backtest_overfitting,

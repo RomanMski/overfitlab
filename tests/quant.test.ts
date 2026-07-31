@@ -34,7 +34,7 @@ test("normInv agrees with scipy to within the approximation's tolerance", () => 
   }
 });
 
-// Reference values from stressfold.expected_maximum_sharpe.
+// Reference values from overfitlab.expected_maximum_sharpe.
 const EXPECTED_MAX_REFERENCE: [number, number][] = [
   [2, 0.051975534428],
   [10, 0.157459830135],

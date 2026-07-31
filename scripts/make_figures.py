@@ -19,7 +19,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-from stressfold import path_stress
+from overfitlab import path_stress
 
 SEED = 20260731
 INK = "#20272E"
@@ -114,7 +114,7 @@ def social(output: Path, trend, hold) -> Path:
     """A 1200x630 card for link previews."""
 
     fig = plt.figure(figsize=(12, 6.3), facecolor=PAPER)
-    fig.text(0.055, 0.82, "StressFold", fontsize=46, fontweight="bold", color=INK)
+    fig.text(0.055, 0.82, "OverfitLab", fontsize=46, fontweight="bold", color=INK)
     fig.text(0.055, 0.735, "How much of your backtest is the search?",
              fontsize=19, color=MUTED)
 

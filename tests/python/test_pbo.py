@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from stressfold import probability_of_backtest_overfitting as pbo
+from overfitlab import probability_of_backtest_overfitting as pbo
 
 
 def _noise(n_periods=600, n_trials=20, seed=0, scale=0.01):
