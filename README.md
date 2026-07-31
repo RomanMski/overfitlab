@@ -2,88 +2,83 @@
 
 **How much of your backtest is the search?**
 
-If you tried two hundred parameter combinations and reported the best one, the number you reported is not the number you have. Some of it is skill and some of it is the search. OverfitLab measures the difference.
+You tried 200 parameter combinations and kept the best one. It shows a Sharpe of 1.5.
+
+So does the best of 200 random ones. That is the problem.
+
+This tells you which of those two you have.
 
 ![Destroy the market's ordering and see what survives](docs/images/structure-sweep.png)
 
-Two strategies on the same market. Both were rerun on hundreds of resampled histories, with less and less of the original ordering left intact. The trend follower needs that ordering and collapses without it. Buy and hold does not notice, because reordering returns cannot change their mean. `scripts/make_figures.py` regenerates this.
+Same market, two strategies, both rerun on hundreds of resampled histories with less and less of the original ordering left. The trend follower needs that ordering. Buy and hold does not notice, because shuffling returns cannot change their mean.
+
+## Three things it measures
+
+**Did you search too hard?** The deflated Sharpe works out what the best of N tries reaches when nothing has an edge, then checks whether yours beats it. Run it on 60 configurations with no signal at all and the winner looks like 1.29 annualised. The bar is 1.37. So that result is worse than nothing.
+
+**Does your winner keep winning?** Cut the history in half every possible way, find the best configuration in one half, look at where it ranks in the other. Above 0.5 means your selection did worse than picking at random.
+
+**Is there anything in the market at all?** Rebuild the price history hundreds of times, rerun the strategy on each, and keep less of the ordering each round:
+
+| block | what survives | trend follower | buy and hold |
+| --- | --- | --- | --- |
+| 1 | nothing, returns shuffled | 0.04 | 0.38 |
+| 5 | runs of 5 | 0.75 | 0.33 |
+| 20 | runs of 20 | 0.92 | 0.39 |
+| 60 | runs of 60 | 1.00 | 0.38 |
+| | **the real market** | **1.00** | **0.36** |
+
+The trend follower dies at block 1 and comes back as the runs return. That is what a timing edge looks like. Buy and hold sits flat the whole way, so whatever it earns, it is not from timing.
+
+## Use it
 
 ```python
-from overfitlab import deflated_sharpe_ratio, path_stress
+from overfitlab import (
+    deflated_sharpe_ratio,
+    path_stress,
+    probability_of_backtest_overfitting,
+)
 
-# trials: (n_periods, n_configurations) of returns, every configuration you tried
-print(deflated_sharpe_ratio(trials, periods_per_year=252))
+# trials: (periods, configurations), every configuration you tried
+deflated_sharpe_ratio(trials, periods_per_year=252)
+probability_of_backtest_overfitting(trials, n_splits=16)
 
-# and rerun the strategy on markets that never happened
-print(path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60)))
+# your strategy on markets that never happened
+path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60))
 ```
 
-## The problem
-
-You sweep a moving-average crossover over 200 parameter pairs. The best one shows an annualised Sharpe of 1.5 and a clean equity curve.
-
-The catch is that the best of 200 random strategies also shows about 1.5. You did not find an edge, you ran a competition, and something always wins a competition.
-
-Two searches can report the same number and mean completely different things. Nothing in a standard backtest report separates them.
-
-## What it measures
-
-**Did you search too hard?** The deflated Sharpe ratio works out what the best of N trials reaches when none of them has any edge, then asks whether yours clears that bar. The probability of backtest overfitting takes every way of cutting your history in half, finds the winner in one half, and measures how often it lands below the median of its peers in the other. Above 0.5 means your selection process is worse than picking at random.
-
-**Is there anything there at all?** `path_stress` rebuilds your price history hundreds of times over and reruns your strategy on each one, destroying market structure by degrees:
-
-| block size | what survives |
-| --- | --- |
-| 1 | nothing, returns drawn independently |
-| 5 | runs of 5 periods kept intact |
-| 20 | runs of 20 |
-| 60 | runs of 60 |
-
-Reading that gradient tells you what the strategy depends on, not just whether it works. A real timing edge should die when ordering is destroyed and recover as the blocks lengthen. Here is a trend follower on a market with genuine momentum:
-
-```
-  block  keeps                       median  the real result beats
-      1  nothing, pure noise           0.04   100.0% of them
-      5  runs of 5 periods             0.75    78.0%
-     20  runs of 20 periods            0.92    60.7%
-     60  runs of 60 periods            1.00    50.0%
-
-Structure dependence 0.96
-```
-
-Sharpe 1.00 on the real path, 0.04 once the ordering goes, back to 1.00 when the runs return. Buy and hold on the same market scores 0.36 and scores 0.38 shuffled, giving a structure dependence of **-0.06**, because reordering cannot change a mean. The sweep says plainly that none of that came from timing.
-
-## Interactive explainers
-
-The site runs three labs in the browser, no install and no data leaving the page.
-
-1. **What overfitting actually is.** A curve fitted to noisy points, with a flexibility slider. Watch the error on the fitted points fall to zero while the error on fresh points climbs.
-2. **How searching manufactures a strategy.** Five hundred strategies with no edge at all. Drag the number you are allowed to look at and watch the winner's Sharpe climb past anything you would call investable.
-3. **Markets that never happened.** The real market against synthetic ones, with the block-size sweep and a toggle between a trend follower and buy and hold.
-
-```bash
-npm ci && npm run dev
-```
-
-## Install
+Pass every configuration you tried. Dropping the bad ones is the exact bias these numbers exist to catch.
 
 ```bash
 python -m pip install -e .
 ```
 
-Python 3.10 or newer, with NumPy, pandas and SciPy.
+Python 3.10 or newer. NumPy, pandas, SciPy.
 
-## Honest limits
+## Or in the browser
 
-The two selection statistics assume your trials are roughly exchangeable. If you searched adaptively, stopping early on the bad ones, the effective number of trials is not the number you ran and both statistics will be optimistic.
+Four labs, nothing installed, nothing uploaded.
 
-The probability of backtest overfitting is blind to time order. It draws combinations of blocks and does not care which came first, so it cannot see a strategy that worked until a regime changed and then stopped. That is a property of the published method, not a bug here, and it is why it is not the only thing reported.
+1. **What overfitting is.** A curve through noisy dots with a flexibility slider. The error on the dots falls to zero. The error on new dots climbs.
+2. **How searching makes a strategy.** 500 strategies with no edge. Drag how many you get to look at and watch the winner get better.
+3. **Markets that never happened.** The block sweep above, with a toggle between the two strategies.
+4. **Your own backtest.** Drop a CSV of returns, one column per configuration, get both numbers.
 
-Resampling preserves volatility clustering only within blocks. Real markets have persistence that outlives that, so the synthetic paths are tamer than reality in the tails.
+```bash
+npm ci && npm run dev
+```
 
-Nothing here models transaction costs. A strategy that trades daily can lose most of its measured edge to spread and slippage, and none of these statistics will notice.
+## What it cannot do
 
-Passing every check is not evidence of an edge. It means selection alone does not explain your result, which is a much weaker claim and the only one the maths supports.
+Both selection statistics assume your trials are roughly interchangeable. If you stopped early on the bad ones, the number of trials you ran is not the number that counts, and both will flatter you.
+
+The overfitting probability ignores time order. It shuffles blocks around and does not care which came first, so a strategy that worked until the regime changed looks fine to it. That is how the published method works. It is why it is not the only thing here.
+
+Resampling keeps volatility clustering inside a block and loses it across blocks. Real markets cluster for longer, so the synthetic paths are calmer in the tails than reality.
+
+No transaction costs anywhere. A daily trend follower can lose most of a 1.00 Sharpe to spread and slippage and none of these numbers will say a word about it.
+
+Passing everything is not evidence of an edge. It only means selection alone does not explain your result. That is a much smaller claim and it is the only one the maths supports.
 
 ## References
 

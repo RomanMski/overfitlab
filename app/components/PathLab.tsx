@@ -151,8 +151,8 @@ export function PathLab() {
 
       <p>
         {useMomentum
-          ? "The trend follower earns its result from the market's tendency to keep going. Drag the slider to block 1 and that tendency is gone, so the strategy collapses to roughly zero on the synthetic markets while the real result beats nearly all of them. Widen the blocks and the persistence comes back, the synthetic markets start supporting the strategy too, and the real result stops looking special. That gradient is the evidence."
-          : "Buy and hold earns from drift, not from timing. Reordering returns cannot change their mean or their spread, so the synthetic markets pay almost exactly what the real one did at every block size. The flat line across the slider is the tell: nothing here depends on the order events arrived in."}
+          ? "The trend follower makes its money from the market's tendency to keep going. Drag to block 1 and that tendency is gone. The strategy collapses to about zero on the synthetic markets, and the real result beats nearly all of them. Widen the blocks and the persistence comes back. Now the synthetic markets support the strategy too, and the real result stops looking special. That gradient is the evidence."
+          : "Buy and hold makes its money from drift, not timing. Reordering returns cannot change their mean or their spread. So the synthetic markets pay almost exactly what the real one did, at every block size. The flat line across the slider is the tell. Nothing here depends on what order things happened in."}
       </p>
     </div>
   );

@@ -118,18 +118,17 @@ export function SearchLab() {
       </p>
 
       <p>
-        Drag the slider. The best curve gets steadily more attractive and its Sharpe
-        climbs past the level most people would call investable, purely because you
-        are looking at more of them. The middle number is what the best of that many
-        coin flips is expected to reach anyway. The third is what is left over, and it stays
-        near zero however far you drag, because there was never anything there.
-        A positive number there is not proof of an edge, only that selection alone
-        does not explain it.
+        Drag the slider. The best curve gets better and its Sharpe climbs past what
+        most people would call investable, only because you are looking at more of
+        them. The middle number is what the best of that many coin flips reaches
+        anyway. The third is what is left, and it stays near zero however far you
+        drag, because there was never anything there. A positive number there is
+        not proof of an edge. It only means selection does not explain it.
       </p>
 
       <p>
-        That is the whole problem with a backtest that reports only its winner. The
-        number is real. What it measures is how hard you searched.
+        That is the problem with a backtest that reports only its winner. The number
+        is real. What it measures is how hard you looked.
       </p>
     </div>
   );

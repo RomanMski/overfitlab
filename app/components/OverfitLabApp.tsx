@@ -24,10 +24,9 @@ export function OverfitLabApp() {
             </div>
             <h1>How much of your backtest is the search?</h1>
             <p className="hero-lede">
-              If you tried two hundred parameter combinations and reported the best
-              one, the number you reported is not the number you have. OverfitLab
-              measures the difference. The three labs below show why it matters, and
-              the Python package measures it on your own trials.
+              You tried 200 parameter combinations and kept the best one. So did
+              the best of 200 random ones. This tells you which of those two you
+              have. Drag the sliders below, then drop in your own backtest.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="#search">
@@ -45,9 +44,8 @@ export function OverfitLabApp() {
               <h2>What overfitting actually is</h2>
             </div>
             <p>
-              Before anything about markets, the idea in its simplest form. A curve
-              is fitted to a handful of noisy points. You control how bendy it is
-              allowed to be.
+              No markets yet. A curve through 22 noisy dots, and you control how
+              bendy it is allowed to be.
             </p>
           </div>
           <CurveLab />
@@ -60,9 +58,8 @@ export function OverfitLabApp() {
               <h2>How searching manufactures a strategy</h2>
             </div>
             <p>
-              The same idea, pointed at backtests. Five hundred strategies, none of
-              which has any edge at all. You control how many of them you are
-              allowed to look at before picking the best.
+              500 strategies. None of them has any edge. You control how many you
+              get to look at before picking the best one.
             </p>
           </div>
           <SearchLab />
@@ -75,10 +72,9 @@ export function OverfitLabApp() {
               <h2>Markets that never happened</h2>
             </div>
             <p>
-              Your backtest ran on one price path. This rebuilds that path
-              hundreds of times over and reruns the strategy on each, destroying
-              the market&apos;s structure by degrees so you can see what the
-              strategy actually depends on.
+              Your backtest ran on one price path. This rebuilds it hundreds of
+              times and reruns the strategy on each, keeping less of the ordering
+              every step, so you can see what the strategy actually needs.
             </p>
           </div>
           <PathLab />
@@ -91,9 +87,8 @@ export function OverfitLabApp() {
               <h2>Run it on your backtest</h2>
             </div>
             <p>
-              Export the period returns of every configuration you tried, one
-              column each, and drop the file below. It is read in this page and
-              never leaves your machine.
+              One column per configuration you tried, one row per period. Drop it
+              below. It is read in this page and never leaves your machine.
             </p>
           </div>
           <TrialLab />
@@ -106,9 +101,7 @@ export function OverfitLabApp() {
               <h2>Or from Python</h2>
             </div>
             <p>
-              Hand over a table of period returns with one column per configuration
-              you backtested. The package never runs your strategy and never sees
-              your data feed.
+              Same numbers, scriptable.
             </p>
           </div>
           <pre className="code-block"><code>{`from overfitlab import (
@@ -124,15 +117,14 @@ print(probability_of_backtest_overfitting(trials, n_splits=16))
 # rerun your strategy on markets that never happened
 print(path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60)))`}</code></pre>
           <p>
-            The deflated Sharpe ratio works out what the best of that many trials
-            reaches when nothing has an edge, then asks whether yours clears it. The
-            probability of backtest overfitting takes every way of splitting your
-            history in half and measures how often the in-sample winner lands below
-            the median of its peers out of sample.
+            The deflated Sharpe works out what the best of that many tries reaches
+            when nothing has an edge, then checks whether yours beats it. The
+            overfitting probability cuts your history in half every possible way. It
+            finds the winner in one half and looks at where it ranks in the other.
           </p>
           <p>
-            Pass every configuration you evaluated. Dropping the ones that did badly
-            is exactly the bias both statistics exist to measure.
+            Pass every configuration you tried. Dropping the bad ones is the exact
+            bias these numbers exist to catch.
           </p>
         </section>
       </main>

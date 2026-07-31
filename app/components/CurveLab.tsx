@@ -51,10 +51,10 @@ export function CurveLab() {
 
   const verdict =
     degree <= 2
-      ? "Too stiff. The line cannot bend enough to follow the real shape, so it is wrong nearly everywhere."
+      ? "Too stiff. The line cannot bend enough to follow the shape, so it is wrong almost everywhere."
       : degree <= 6
-        ? "About right. The curve follows the underlying shape and ignores the scatter around it."
-        : "Overfitting. The curve is now bending to reach individual dots, and it is wrong in the gaps between them.";
+        ? "About right. It follows the shape and ignores the scatter."
+        : "Overfitting. It is now bending to reach single dots, and it is wrong in the gaps between them.";
 
   return (
     <div className="ol">
@@ -132,11 +132,10 @@ export function CurveLab() {
       <p className="ol-verdict">{verdict}</p>
 
       <p>
-        Drag flexibility to the right and the first number keeps falling, because a
-        bendier curve can always pass closer to the dots in front of it. Watch the
-        second number instead. It falls, bottoms out, and then climbs, and the gap
-        between the two is the overfitting. Every drop in the first number past that
-        point is bought by fitting noise that will not repeat.
+        Drag right and the first number keeps falling. A bendier curve can always
+        get closer to the dots in front of it. Watch the second one instead. It
+        falls, bottoms out, then climbs. Past that turn, every drop in the first
+        number is paid for by fitting noise that will not happen again.
       </p>
     </div>
   );
