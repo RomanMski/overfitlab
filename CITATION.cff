@@ -11,14 +11,15 @@ authors:
 repository-code: "https://github.com/RomanMski/stressfold"
 url: "https://github.com/RomanMski/stressfold"
 abstract: >-
-  StressFold is a deterministic, local-first protocol for measuring clean
-  generalization gaps, perturbation-response curves, training stability, and
-  descriptive label-permutation diagnostics for tabular binary classification
-  and regression.
+  StressFold measures how much of a backtested result came from searching a
+  parameter space rather than from skill. It reports a deflated Sharpe ratio,
+  the probability of backtest overfitting, and a sweep that reruns a strategy
+  on resampled price histories to show what market structure the result
+  depends on.
 keywords:
-  - generalization
-  - robustness
-  - overfitting
-  - permutation diagnostics
-  - tabular machine learning
+  - backtest overfitting
+  - deflated sharpe ratio
+  - selection bias
+  - quantitative finance
+  - strategy validation
 license: MIT
