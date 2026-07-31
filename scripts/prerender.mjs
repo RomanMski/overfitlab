@@ -23,13 +23,22 @@ if (response.status !== 200) {
   throw new Error(`prerender got HTTP ${response.status}`);
 }
 
-const html = await response.text();
-
-// Vite emits every asset URL under SITE_BASE_PATH already, so nothing needs
-// rewriting here. Assert it rather than trust it. A page whose scripts 404
-// still renders and still looks correct, right up until someone touches a
-// control and nothing happens, which is exactly how this shipped broken once.
 const base = process.env.SITE_BASE_PATH || "/";
+let html = await response.text();
+
+// Vite puts everything it emits under the base, with one exception: the font
+// plugin writes /assets/_vinext_fonts/... preload links directly and ignores
+// the base entirely. On Windows those come out as file:// paths, so this only
+// shows up on Linux, which is how it reached CI unnoticed. Patch that prefix
+// specifically rather than rewriting URLs in general.
+if (base !== "/") {
+  html = html.replace(/(href|src)="\/assets\//g, `$1="${base}assets/`);
+}
+
+// Then assert, rather than trust, that nothing absolute escaped the base. A
+// page whose scripts 404 still renders and still looks correct, right up until
+// someone touches a control and nothing happens, which is how this shipped
+// broken the first time.
 const stray = [...html.matchAll(/(?:href|src)="(\/[^"]*)"/g)]
   .map((match) => match[1])
   .filter((url) => !url.startsWith(base));
