@@ -30,11 +30,18 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Build for the Pages subpath
+        run: npm run build
+        env:
+          SITE_BASE_PATH: /overfitlab/
+
       - name: Build and run browser checks
         run: npm test
 
       - name: Render the static site
         run: node scripts/prerender.mjs
+        env:
+          SITE_BASE_PATH: /overfitlab/
 
       - name: Upload the artifact
         uses: actions/upload-pages-artifact@v3

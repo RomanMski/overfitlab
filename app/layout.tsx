@@ -27,14 +27,17 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("x-forwarded-proto") ??
     (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const socialImage = `${origin}/og.png`;
+  // Matches the Vite base, so the icon resolves when the site is served from
+  // a repository subpath rather than a domain root.
+  const basePath = process.env.SITE_BASE_PATH || "/";
+  const socialImage = `${origin}${basePath}og.png`;
 
   return {
     title,
     description,
     icons: {
-      icon: "/favicon.svg",
-      shortcut: "/favicon.svg",
+      icon: `${basePath}favicon.svg`,
+      shortcut: `${basePath}favicon.svg`,
     },
     keywords: [
       "backtest overfitting",

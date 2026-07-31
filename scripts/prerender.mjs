@@ -4,12 +4,8 @@
  * The labs all run in the browser, so nothing here needs a server at runtime.
  * This reuses the same worker entry the tests exercise, so the HTML that ships
  * is the HTML the render test asserts against.
- *
- * Asset URLs are rewritten from absolute to relative because GitHub Pages
- * serves the project from a /<repo>/ subpath, where /assets/... would 404.
  */
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 const root = new URL("../", import.meta.url);
 const clientDir = new URL("dist/client/", root);
@@ -27,23 +23,26 @@ if (response.status !== 200) {
   throw new Error(`prerender got HTTP ${response.status}`);
 }
 
-let html = await response.text();
-const before = html;
-html = html
-  .replace(/(href|src)="\/(assets\/)/g, '$1="./$2')
-  .replace(/(href|src)="\/(favicon\.svg|og\.png)"/g, '$1="./$2"');
+const html = await response.text();
 
-if (html === before) {
-  throw new Error("no absolute asset URLs were rewritten, check the output shape");
-}
-if (/(href|src)="\/[a-z]/.test(html)) {
-  throw new Error("an absolute URL survived the rewrite and would 404 on Pages");
+// Vite emits every asset URL under SITE_BASE_PATH already, so nothing needs
+// rewriting here. Assert it rather than trust it. A page whose scripts 404
+// still renders and still looks correct, right up until someone touches a
+// control and nothing happens, which is exactly how this shipped broken once.
+const base = process.env.SITE_BASE_PATH || "/";
+const stray = [...html.matchAll(/(?:href|src)="(\/[^"]*)"/g)]
+  .map((match) => match[1])
+  .filter((url) => !url.startsWith(base));
+
+if (stray.length > 0) {
+  const list = stray.join("\n  ");
+  throw new Error(`these URLs sit outside ${base} and would 404 once live:\n  ${list}`);
 }
 
 writeFileSync(new URL("index.html", clientDir), html, "utf8");
-// GitHub Pages runs Jekyll by default, which drops files beginning with _.
+// GitHub Pages runs Jekyll by default, which drops paths beginning with _.
 writeFileSync(new URL(".nojekyll", clientDir), "", "utf8");
-// A single page app with hash anchors: send unknown paths to the same document.
+// One page with hash anchors, so unknown paths should land on the same document.
 writeFileSync(new URL("404.html", clientDir), html, "utf8");
 
-console.log(`prerendered ${html.length} bytes into dist/client/index.html`);
+console.log(`prerendered ${html.length} bytes under base ${base}`);
