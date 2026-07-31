@@ -303,3 +303,97 @@ export function searchSnapshot(
     excess: bestSharpe - expectedBest,
   };
 }
+
+/* ---------------------------------------------------------------------------
+ * Alternative histories. Mirrors stressfold.synthetic.
+ * Resampling with longer blocks keeps more ordering intact, so sweeping the
+ * block length destroys market structure by degrees.
+ * ------------------------------------------------------------------------- */
+
+/** Resample with geometric block lengths (Politis and Romano). */
+export function stationaryBootstrap(
+  returns: number[],
+  expectedBlock: number,
+  rng: () => number,
+): number[] {
+  const n = returns.length;
+  const restart = 1 / Math.max(expectedBlock, 1);
+  const out: number[] = new Array(n);
+  let index = Math.floor(rng() * n) % n;
+  for (let step = 0; step < n; step += 1) {
+    if (step > 0) {
+      index = rng() < restart ? Math.floor(rng() * n) % n : (index + 1) % n;
+    }
+    out[step] = returns[index];
+  }
+  return out;
+}
+
+/** Hold yesterday's direction. Profitable only if returns persist. */
+export function momentumStrategy(market: number[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < market.length; i += 1) {
+    out.push(Math.sign(market[i - 1]) * market[i]);
+  }
+  return out;
+}
+
+export function buyAndHold(market: number[]): number[] {
+  return market;
+}
+
+/** A market with tunable momentum: r_t = phi * r_{t-1} + shock + drift. */
+export function autocorrelatedMarket(
+  seed: number,
+  periods: number,
+  phi: number,
+  drift = 0.0003,
+  volatility = 0.011,
+): number[] {
+  const shocks = normalDraws(makeRng(seed), periods).map((v) => v * volatility);
+  const out: number[] = [shocks[0]];
+  for (let i = 1; i < periods; i += 1) {
+    out.push(phi * out[i - 1] + shocks[i] + drift);
+  }
+  return out;
+}
+
+export interface PathStressLevel {
+  blockSize: number;
+  medianAnnualised: number;
+  p95Annualised: number;
+  percentile: number;
+}
+
+/** Rerun a strategy on synthetic markets at several block lengths. */
+export function pathStress(
+  strategy: (market: number[]) => number[],
+  market: number[],
+  blockSizes: number[],
+  nPaths: number,
+  seed: number,
+  periodsPerYear = 252,
+): { observedAnnualised: number; levels: PathStressLevel[] } {
+  const annualiser = Math.sqrt(periodsPerYear);
+  const observed = sharpe(strategy(market));
+  const levels: PathStressLevel[] = [];
+
+  for (let position = 0; position < blockSizes.length; position += 1) {
+    const block = blockSizes[position];
+    const rng = makeRng(seed * 7919 + position);
+    const scores: number[] = [];
+    for (let path = 0; path < nPaths; path += 1) {
+      scores.push(sharpe(strategy(stationaryBootstrap(market, block, rng))));
+    }
+    scores.sort((a, b) => a - b);
+    const quantile = (q: number) =>
+      scores[Math.min(scores.length - 1, Math.floor(q * scores.length))];
+    levels.push({
+      blockSize: block,
+      medianAnnualised: quantile(0.5) * annualiser,
+      p95Annualised: quantile(0.95) * annualiser,
+      percentile: (scores.filter((s) => s < observed).length / scores.length) * 100,
+    });
+  }
+  return { observedAnnualised: observed * annualiser, levels };
+}

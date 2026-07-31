@@ -1,6 +1,7 @@
 "use client";
 
 import { OverfitLab } from "./OverfitLab";
+import { PathLab } from "./PathLab";
 import { SearchLab } from "./SearchLab";
 
 export function StressFoldApp() {
@@ -24,7 +25,7 @@ export function StressFoldApp() {
             <p className="hero-lede">
               If you tried two hundred parameter combinations and reported the best
               one, the number you reported is not the number you have. StressFold
-              measures the difference. The two labs below show why it matters, and
+              measures the difference. The three labs below show why it matters, and
               the Python package measures it on your own trials.
             </p>
             <div className="hero-actions">
@@ -66,6 +67,22 @@ export function StressFoldApp() {
           <SearchLab />
         </section>
 
+        <section className="lab-section" id="paths">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">Lab three</div>
+              <h2>Markets that never happened</h2>
+            </div>
+            <p>
+              Your backtest ran on one price path. This rebuilds that path
+              hundreds of times over and reruns the strategy on each, destroying
+              the market&apos;s structure by degrees so you can see what the
+              strategy actually depends on.
+            </p>
+          </div>
+          <PathLab />
+        </section>
+
         <section className="lab-section" id="package">
           <div className="section-heading">
             <div>
@@ -80,12 +97,16 @@ export function StressFoldApp() {
           </div>
           <pre className="code-block"><code>{`from stressfold import (
     deflated_sharpe_ratio,
+    path_stress,
     probability_of_backtest_overfitting,
 )
 
 # trials: (n_periods, n_configurations) of returns
 print(deflated_sharpe_ratio(trials, periods_per_year=252))
-print(probability_of_backtest_overfitting(trials, n_splits=16))`}</code></pre>
+print(probability_of_backtest_overfitting(trials, n_splits=16))
+
+# rerun your strategy on markets that never happened
+print(path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60)))`}</code></pre>
           <p>
             The deflated Sharpe ratio works out what the best of that many trials
             reaches when nothing has an edge, then asks whether yours clears it. The
