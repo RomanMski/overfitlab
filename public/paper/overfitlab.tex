@@ -31,7 +31,7 @@
 \maketitle
 
 \begin{abstract}
-A backtest reports the best of everything you tried. That number is biased upward, and the size of the bias grows with how hard you searched. Two published corrections already exist for this, the deflated Sharpe ratio and the probability of backtest overfitting, and both are implemented here. Neither answers a second question that matters just as much: whether the market contains anything the strategy is reading. This paper describes a third measurement that does. The price history is resampled at a range of block lengths, from fully shuffled to almost intact, and the strategy is rerun on every resulting path. The resulting curve separates a timing edge, which dies when ordering is destroyed and returns as blocks lengthen, from a result that never depended on ordering at all. On a simulated market with genuine momentum a trend follower scores 1.00 annualised, falls to a median of 0.04 once returns are shuffled, and recovers to 1.00 at a block length of 60. Buy and hold on the same market scores 0.36 and scores 0.38 shuffled, because reordering cannot change a mean. All three measurements are packaged as an open library with a browser implementation that agrees with it to six decimal places.
+A backtest reports the best of everything you tried. That number is biased upward, and the size of the bias grows with how hard you searched. Two published corrections already exist for this, the deflated Sharpe ratio and the probability of backtest overfitting, and both are implemented here. Neither answers a second question that matters just as much: whether the market contains anything the strategy is reading. This paper describes a third diagnostic that speaks to it. The price history is resampled at a range of block lengths, from fully shuffled to almost intact, and the strategy is rerun on every resulting path. The resulting curve separates a timing edge, which dies when ordering is destroyed and returns as blocks lengthen, from a result that never depended on ordering at all. On a simulated market with genuine momentum a trend follower scores 1.00 annualised, falls to a median of 0.04 once returns are shuffled, and recovers to 1.00 at a block length of 60. Buy and hold on the same market scores 0.36 and scores 0.38 shuffled, because reordering cannot change a mean. All three are packaged as an open library with a browser implementation that agrees with it to six decimal places.
 \end{abstract}
 
 \section{The problem}
@@ -50,7 +50,7 @@ The second question has a natural experiment behind it. A strategy that times en
 
 Let $r_{1:T}$ be the observed return series and let $A$ be a strategy mapping a return series to the returns it would have earned on it. Let $B_\ell$ denote a resampling scheme with expected block length $\ell$, so that runs of about $\ell$ consecutive observations are preserved and only their arrangement changes. We use the stationary bootstrap of \citet{politis1994stationary}, whose geometric block lengths leave the resampled series stationary, unlike the fixed-length moving block scheme of \citet{kunsch1989jackknife}.
 
-At $\ell = 1$ the scheme reduces to independent resampling. Every autocorrelation, every volatility cluster, every trend is gone, while the marginal distribution of returns is untouched. At large $\ell$ almost all local structure survives.
+At $\ell = 1$ the scheme reduces to independent resampling. Every autocorrelation, every volatility cluster and every trend is gone, while the marginal distribution is preserved exactly: the mean, the variance, the skewness and every individual extreme observation are those of the original series. This is worth stating plainly because it is easy to describe the shuffled series as noise, and it is not. It is the same returns in a different order. At large $\ell$ most local structure survives as well.
 
 For each $\ell$ in a grid, draw $M$ paths and compute
 \[
@@ -63,6 +63,8 @@ alongside the observed $S_{\mathrm{obs}} = \mathrm{SR}(A(r_{1:T}))$. Reading $S_
 \end{equation}
 which is near one when the result vanishes under shuffling and near zero when shuffling changes nothing.
 
+$D$ is a descriptive summary and not a test statistic. It is undefined at $S_{\mathrm{obs}} = 0$, unstable when the observed Sharpe is small, and unbounded in both directions. No confidence interval or calibrated null is offered for it here. The curve $S_\ell$ is the object to read; $D$ only labels its left end.
+
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{../docs/images/structure-sweep.png}
@@ -70,11 +72,17 @@ which is near one when the result vanishes under shuffling and near zero when sh
   \label{fig:sweep}
 \end{figure}
 
+\subsection{Relation to existing methods}
+
+Resampling a series to break dependence and rerunning a procedure on the result is not new. It is the surrogate-data method familiar from nonlinear time-series analysis, and it is closely related to permutation testing, to bootstrap inference for dependent data \citep{politis1994stationary,kunsch1989jackknife}, and to the data-snooping framework of \citet{white2000reality}, which resamples in order to build a null for the maximum over many models. What is offered here is narrower than a new method: it is the specific practice of sweeping $\ell$ rather than choosing one value, and reading the resulting curve as a statement about which kind of structure a result depends on. A single block length answers a single question. The gradient is what distinguishes the two cases below.
+
 \section{What the curve separates}
 
 Figure~\ref{fig:sweep} runs the sweep on a simulated market with mild genuine momentum, $r_t = 0.06\,r_{t-1} + \varepsilon_t + \mu$, and two strategies.
 
 The trend follower holds yesterday's direction. On the observed path it earns 1.00 annualised. At $\ell = 1$ the median across synthetic markets is 0.04 and the observed result exceeds every one of the 300 paths. As $\ell$ grows the synthetic markets regain the persistence the strategy trades, the median climbs to 0.75, 0.92 and 1.00, and the observed result stops being exceptional, beating only 50\% of paths at $\ell = 60$. Its structure dependence is $D = 0.96$.
+
+This does not on its own establish a timing edge. A strategy whose exposure depends on recent realised variance, one with path-dependent position sizing, one with a lookback window that warms up differently on a reordered series, or one with an ordinary leakage bug will all collapse under shuffling in the same way. The sweep narrows the question from ``is this result real'' to ``this result requires the ordering, so what about the ordering is it using''. That is a smaller claim than it may first appear, and it is the claim the experiment supports.
 
 Buy and hold earns 0.36 on the observed path and between 0.33 and 0.39 at every block length, giving $D = -0.06$. This is not a failure of the method. It is the correct answer: buy and hold earns from drift, drift is a property of the marginal distribution, and resampling preserves the marginal distribution exactly. A flat curve is informative. It says the result does not depend on when anything happened, which for a strategy that claims to time the market would be damning.
 

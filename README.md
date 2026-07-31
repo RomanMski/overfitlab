@@ -22,13 +22,15 @@ Same market, two strategies, both rerun on hundreds of resampled histories with 
 
 | block | what survives | trend follower | buy and hold |
 | --- | --- | --- | --- |
-| 1 | nothing, returns shuffled | 0.04 | 0.38 |
+| 1 | order only, marginals kept | 0.04 | 0.38 |
 | 5 | runs of 5 | 0.75 | 0.33 |
 | 20 | runs of 20 | 0.92 | 0.39 |
 | 60 | runs of 60 | 1.00 | 0.38 |
 | | **the real market** | **1.00** | **0.36** |
 
-The trend follower dies at block 1 and comes back as the runs return. That is what a timing edge looks like. Buy and hold sits flat the whole way, so whatever it earns, it is not from timing.
+The trend follower dies at block 1 and comes back as the runs return. Buy and hold sits flat the whole way.
+
+One thing to be careful about. Shuffling does not make the returns random. It keeps the mean, the variance, the skew and every fat tail exactly as they were, and only changes the order. That is why buy and hold is unaffected. And a strategy that collapses under shuffling has shown that its result needs the ordering, which is consistent with a timing edge but also with volatility targeting, position sizing that depends on recent variance, or a lookback bug. The sweep narrows it down. It does not settle it.
 
 ## Use it
 

@@ -8,10 +8,11 @@ This module builds new paths from the one you have and reruns the strategy on
 each. The interesting control is *how much structure the resampling keeps*:
 
 ``block_size = 1``
-    Every ordering is destroyed. Returns are drawn independently, so no
-    autocorrelation, no momentum, no mean reversion, nothing a timing rule can
-    exploit. Volatility clustering is gone too. A strategy that still scores
-    well here is not trading time structure at all, and is usually just long.
+    Serial dependence is destroyed. Returns are drawn independently, so no
+    autocorrelation, no momentum, no mean reversion and no volatility
+    clustering survives. The *marginal* distribution is untouched, so the mean,
+    the variance, the skew and every fat tail are exactly as observed. This is
+    not a noise series. It is the same returns in a different order.
 
 ``block_size = 20``
     Runs of twenty periods are kept intact and only their order is shuffled.
@@ -168,10 +169,16 @@ class PathStressResult:
     def structure_dependence(self) -> float:
         """How much of the result needs market structure to exist.
 
-        One means the strategy collapses entirely once ordering is destroyed,
-        which is what a genuine timing edge looks like. Zero means it does just
-        as well on independently shuffled returns, so whatever it earns does
-        not come from timing.
+        One means the result collapses entirely once ordering is destroyed.
+        Zero means it survives shuffling untouched, so whatever it earns comes
+        from the marginal distribution rather than from the arrangement.
+
+        A high value says the result depends on the ordering of this series
+        under this resampling scheme. It does not by itself establish a timing
+        edge, because volatility targeting, path-dependent sizing, lookback
+        warm-up and ordinary backtest bugs all produce the same signature.
+        Treat it as descriptive. It is unstable when the observed Sharpe is
+        near zero and it carries no confidence interval.
         """
 
         if not self.levels:
@@ -193,7 +200,7 @@ class PathStressResult:
         for level in self.levels:
             block = int(level["block_size"])
             keeps = (
-                "nothing, pure noise"
+                "order only, marginals kept"
                 if block == 1
                 else f"runs of {block} periods"
             )
@@ -212,8 +219,9 @@ class PathStressResult:
             )
         else:
             lines.append(
-                "  Most of the result disappears once ordering is destroyed, which"
-                " is what a timing edge should do."
+                "  Most of the result disappears once ordering is destroyed."
+                " Consistent with a timing edge, and also with volatility"
+                " targeting, path-dependent sizing or a lookback bug."
             )
         return "\n".join(lines)
 
@@ -249,7 +257,13 @@ def path_stress(
     if not blocks or blocks[0] < 1:
         raise ValueError("block_sizes must all be at least 1")
 
-    observed = _sharpe(np.asarray(strategy(data), dtype=float).reshape(-1))
+    observed_returns = np.asarray(strategy(data), dtype=float).reshape(-1)
+    if observed_returns.size < 2 or not np.all(np.isfinite(observed_returns)):
+        raise ValueError(
+            "the strategy returned too few or non-finite values on the real "
+            "series, so there is nothing to compare the synthetic paths against"
+        )
+    observed = _sharpe(observed_returns)
     annualiser = float(np.sqrt(periods_per_year))
     errors: list[str] = []
     levels: list[dict[str, float]] = []
@@ -273,6 +287,18 @@ def path_stress(
                 result = np.asarray(strategy(paths[index]), dtype=float).reshape(-1)
             except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
                 errors.append(f"block {block} path {index}: {type(exc).__name__}: {exc}")
+                continue
+            # A strategy that returns NaN would otherwise poison the median and
+            # every quantile for this level, and the level would still be
+            # reported as though it had succeeded.
+            if result.size < 2:
+                errors.append(f"block {block} path {index}: returned {result.size} values")
+                continue
+            if not np.all(np.isfinite(result)):
+                bad = int(np.count_nonzero(~np.isfinite(result)))
+                errors.append(
+                    f"block {block} path {index}: {bad} non-finite values returned"
+                )
                 continue
             scores.append(_sharpe(result))
         if not scores:

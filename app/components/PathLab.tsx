@@ -71,7 +71,7 @@ export function PathLab() {
 
   const keeps =
     block === 1
-      ? "Nothing. Returns are drawn independently, so every trace of ordering is gone."
+      ? "Order only. Returns are drawn independently, so no autocorrelation survives. The mean, the spread and the fat tails are exactly as they were, which is why this is not a noise series."
       : `Runs of ${block} periods stay intact and only their order is shuffled.`;
 
   return (
@@ -151,7 +151,7 @@ export function PathLab() {
 
       <p>
         {useMomentum
-          ? "The trend follower makes its money from the market's tendency to keep going. Drag to block 1 and that tendency is gone. The strategy collapses to about zero on the synthetic markets, and the real result beats nearly all of them. Widen the blocks and the persistence comes back. Now the synthetic markets support the strategy too, and the real result stops looking special. That gradient is the evidence."
+          ? "The trend follower makes its money from the market's tendency to keep going. Drag to block 1 and that tendency is gone. The strategy collapses to about zero, and the real result beats nearly all the synthetic markets. Widen the blocks and the persistence comes back, so the synthetic markets support the strategy too and the real result stops looking special. That gradient is the evidence. It shows the result needs the ordering, which is consistent with a timing edge and also with volatility targeting or a lookback bug, so it narrows the question rather than closing it."
           : "Buy and hold makes its money from drift, not timing. Reordering returns cannot change their mean or their spread. So the synthetic markets pay almost exactly what the real one did, at every block size. The flat line across the slider is the tell. Nothing here depends on what order things happened in."}
       </p>
     </div>

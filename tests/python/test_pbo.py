@@ -144,3 +144,25 @@ def test_rejects_missing_values():
 def test_rejects_a_history_too_short_for_the_blocks():
     with pytest.raises(ValueError, match="cannot be cut"):
         pbo(_noise(n_periods=20, seed=11), n_splits=16)
+
+
+def test_sampled_combinations_are_distinct():
+    """Independently sampled rows can repeat, which over-weights a partition."""
+
+    import numpy as np
+
+    from overfitlab.pbo import probability_of_backtest_overfitting
+
+    rng = np.random.default_rng(0)
+    returns = rng.normal(scale=0.01, size=(600, 12))
+
+    result = probability_of_backtest_overfitting(
+        returns, n_splits=16, max_combinations=200, random_state=5
+    )
+
+    assert result.combinations_were_sampled
+    # Distinct partitions only, so the count cannot exceed what was asked for
+    # and each one carries equal weight in the average.
+    assert result.n_combinations <= 200
+    assert result.n_combinations > 150
+    assert 0.0 <= result.pbo <= 1.0

@@ -195,7 +195,7 @@ def test_summary_text_reports_the_gradient():
     text = result.summary_text()
 
     assert "Observed Sharpe" in text
-    assert "nothing, pure noise" in text
+    assert "order only, marginals kept" in text
     assert "runs of 20 periods" in text
     assert "Structure dependence" in text
 
@@ -208,3 +208,38 @@ def test_sweep_validation():
         path_stress(always_long, market, periods_per_year=0)
     with pytest.raises(ValueError, match="block_sizes"):
         path_stress(always_long, market, block_sizes=(0,))
+
+
+def test_non_finite_strategy_output_is_recorded_not_averaged_in():
+    """A NaN path used to poison the median for its whole level.
+
+    The path was counted as a success, so the level still reported a result and
+    every quantile for it came back NaN.
+    """
+
+    market = ar1_market(400)
+    calls = {"n": 0}
+
+    def sometimes_nan(values: np.ndarray) -> np.ndarray:
+        calls["n"] += 1
+        out = values.copy()
+        if calls["n"] % 4 == 0:
+            out[0] = np.nan
+        return out
+
+    result = path_stress(
+        sometimes_nan, market, block_sizes=(1,), n_paths=40, seed=3
+    )
+    level = result.levels[0]
+
+    assert np.isfinite(level["median_annualised"])
+    assert np.isfinite(level["p95_annualised"])
+    # The bad paths are dropped and reported rather than silently included.
+    assert level["n_paths"] < 40
+    assert any("non-finite" in message for message in result.errors)
+
+
+def test_a_strategy_that_returns_nothing_usable_fails_loudly():
+    market = ar1_market(400)
+    with pytest.raises(ValueError, match="non-finite"):
+        path_stress(lambda values: np.full(values.size, np.nan), market, n_paths=4)

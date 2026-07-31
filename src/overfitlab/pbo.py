@@ -232,10 +232,18 @@ def probability_of_backtest_overfitting(
     sampled = total > max_combinations
     if sampled:
         rng = np.random.default_rng(random_state)
-        masks = np.zeros((max_combinations, n_splits), dtype=bool)
-        for row in range(max_combinations):
+        # Draw distinct partitions. Sampling each row independently can repeat a
+        # partition, which silently gives it extra weight in the average.
+        seen: set[tuple[int, ...]] = set()
+        attempts = 0
+        limit = max_combinations * 50
+        while len(seen) < max_combinations and attempts < limit:
             chosen = rng.choice(n_splits, size=n_splits // 2, replace=False)
-            masks[row, chosen] = True
+            seen.add(tuple(sorted(int(value) for value in chosen)))
+            attempts += 1
+        masks = np.zeros((len(seen), n_splits), dtype=bool)
+        for row, chosen in enumerate(sorted(seen)):
+            masks[row, list(chosen)] = True
     else:
         masks = np.zeros((total, n_splits), dtype=bool)
         for row, chosen in enumerate(combinations(range(n_splits), n_splits // 2)):
