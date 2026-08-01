@@ -11,10 +11,12 @@ from .deflated import (
 from .pbo import PBOResult, probability_of_backtest_overfitting
 from .synthetic import (
     PathStressResult,
+    generate_datasets,
     iid_bootstrap,
     moving_block_bootstrap,
     path_stress,
     stationary_bootstrap,
+    write_datasets,
 )
 
 __all__ = [
@@ -24,10 +26,12 @@ __all__ = [
     "deflated_sharpe_ratio",
     "expected_maximum_sharpe",
     "probabilistic_sharpe_ratio",
+    "generate_datasets",
     "iid_bootstrap",
     "moving_block_bootstrap",
     "path_stress",
     "probability_of_backtest_overfitting",
     "stationary_bootstrap",
+    "write_datasets",
     "sharpe_ratio",
 ]

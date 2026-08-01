@@ -1,6 +1,7 @@
 "use client";
 
 import { CurveLab } from "./CurveLab";
+import { GeneratorLab } from "./GeneratorLab";
 import { PathLab } from "./PathLab";
 import { SearchLab } from "./SearchLab";
 import { TrialLab } from "./TrialLab";
@@ -29,14 +30,30 @@ export function OverfitLabApp() {
               have. Drag the sliders below, then drop in your own backtest.
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="#search">
-                See it happen <span aria-hidden="true">→</span>
+              <a className="button button-primary" href="#generate">
+                Generate datasets <span aria-hidden="true">→</span>
               </a>
               <a className="button button-quiet" href="#test">Test your own backtest</a>
               <a className="button button-quiet" href="./paper/overfitlab.pdf"
                  target="_blank" rel="noreferrer">Read the paper</a>
             </div>
           </div>
+        </section>
+
+        <section className="lab-section" id="generate">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">Generate datasets</div>
+              <h2>Make versions of your history to test against</h2>
+            </div>
+            <p>
+              Bring a price or return series. This builds hundreds of
+              alternative versions of it, each keeping a different amount of the
+              original ordering, and hands them back as CSV files. Run your own
+              model on them however you normally would.
+            </p>
+          </div>
+          <GeneratorLab />
         </section>
 
         <section className="lab-section" id="overfit">

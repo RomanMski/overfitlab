@@ -326,3 +326,110 @@ def path_stress(
         levels=tuple(levels),
         errors=tuple(errors),
     )
+
+
+def generate_datasets(
+    returns: Sequence[float] | np.ndarray,
+    *,
+    block_sizes: Sequence[int] = (1, 5, 20, 60),
+    n_paths: int = 100,
+    seed: int = 0,
+    stationary: bool = True,
+) -> dict[int, np.ndarray]:
+    """Build alternative versions of a return series and hand them back.
+
+    Returns a mapping from block length to an array of shape
+    ``(n_paths, len(returns))``. Nothing is scored here and no strategy is
+    involved. Take the arrays, run whatever you like on them, and compare.
+
+    Each block length answers a different question. At 1 the ordering is gone
+    and only the marginal distribution survives, so a model that still performs
+    there is not using time structure. At 60 runs of sixty periods stay intact.
+    Sweeping the range is more informative than picking one value.
+
+    Every value in every generated series appeared in the original. Resampling
+    reorders, so these are alternative arrangements of your history rather than
+    new observations, and they cannot tell you about behaviour your data never
+    contained.
+    """
+
+    data = _as_returns(returns, name="returns")
+    blocks = sorted({int(size) for size in block_sizes})
+    if not blocks or blocks[0] < 1:
+        raise ValueError("block_sizes must all be at least 1")
+    if n_paths < 1:
+        raise ValueError("n_paths must be at least 1")
+
+    out: dict[int, np.ndarray] = {}
+    for position, block in enumerate(blocks):
+        level_seed = seed * 1_000_003 + position
+        if block == 1:
+            out[block] = iid_bootstrap(data, n_paths, seed=level_seed)
+        elif stationary:
+            out[block] = stationary_bootstrap(
+                data, n_paths, expected_block=float(block), seed=level_seed
+            )
+        else:
+            out[block] = moving_block_bootstrap(
+                data, n_paths, block_size=block, seed=level_seed
+            )
+    return out
+
+
+def write_datasets(
+    returns: Sequence[float] | np.ndarray,
+    directory: str,
+    *,
+    block_sizes: Sequence[int] = (1, 5, 20, 60),
+    n_paths: int = 100,
+    seed: int = 0,
+    stationary: bool = True,
+) -> dict[str, object]:
+    """Write the generated series to CSV files and return a manifest.
+
+    One file per block length, each column a generated path. The manifest
+    records the settings and a hash of the input so a result can be traced back
+    to the series it came from.
+    """
+
+    import csv
+    import hashlib
+    import json
+    import os
+
+    data = _as_returns(returns, name="returns")
+    datasets = generate_datasets(
+        data,
+        block_sizes=block_sizes,
+        n_paths=n_paths,
+        seed=seed,
+        stationary=stationary,
+    )
+    os.makedirs(directory, exist_ok=True)
+
+    digest = hashlib.blake2b(data.tobytes(), digest_size=8).hexdigest()
+    files = []
+    for block, paths in datasets.items():
+        name = f"block-{block:03d}.csv"
+        with open(os.path.join(directory, name), "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow([f"path_{index + 1}" for index in range(paths.shape[0])])
+            for row in paths.T:
+                writer.writerow([f"{value:.10g}" for value in row])
+        files.append({"file": name, "block_size": block, "n_paths": int(paths.shape[0])})
+
+    manifest = {
+        "source_periods": int(data.size),
+        "source_fingerprint": digest,
+        "seed": int(seed),
+        "scheme": "stationary" if stationary else "moving block",
+        "files": files,
+        "note": (
+            "Every value in these files appeared in the source series. They are "
+            "reorderings, not new observations, and they carry no information "
+            "the source did not already contain."
+        ),
+    }
+    with open(os.path.join(directory, "manifest.json"), "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+    return manifest

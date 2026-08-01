@@ -1,14 +1,31 @@
 # OverfitLab
 
-You tried 200 parameter combinations and kept the best one. It shows a Sharpe of 1.5. So does the best of 200 random ones. This library tells you which of those two you have.
+Give it a price or return series and it builds hundreds of alternative versions of that history, each keeping a different amount of the original ordering, and hands them back as CSV files. Run your own model on them however you normally would and compare. It never needs to see your model.
 
-The demo is at [romanmski.github.io/overfitlab](https://romanmski.github.io/overfitlab/) and runs everything in the browser. There is a short [paper](paper/main.pdf) with the reasoning and the references.
+A model that performs the same on a version with the ordering destroyed was not using time structure, whatever it claims. One that collapses there and recovers as the ordering returns is reading something in the arrangement.
+
+The [demo](https://romanmski.github.io/overfitlab/) does this in the browser with nothing installed and nothing uploaded. There is a short [paper](paper/main.pdf) with the reasoning and the references.
 
 ![Destroy the market's ordering and see what survives](docs/images/structure-sweep.png)
 
-## What it checks
+## Generating the datasets
 
-Run it on 60 configurations built from pure noise, with a true Sharpe of exactly zero in every one, and the best of them still comes out at 1.29 annualised. The best of 60 coin flips reaches about 1.37, so 1.29 is actually below what luck alone produces. On its own that number would pass most informal screening. The deflated Sharpe ratio works out that bar for however many things you tried and checks whether your result clears it.
+```python
+from overfitlab import write_datasets
+
+# returns: your series. One CSV per block length, plus a manifest.
+write_datasets(returns, "generated/", block_sizes=(1, 5, 20, 60), n_paths=100)
+```
+
+At block 1 the returns are drawn independently, so no ordering survives while the mean, the variance, the skew and every fat tail stay exactly as they were. At block 60 runs of sixty periods stay intact and only their arrangement changes. Sweeping the range tells you more than picking one value.
+
+Every value in every generated series appeared in your original. Resampling reorders, so these are alternative arrangements rather than new observations, and they carry no information your data did not already contain. Nothing that only reads your history can do better than that.
+
+## If you also want the checks scored for you
+
+Three statistics are included for people who would rather hand over the strategy than run the comparison themselves.
+
+Run them on 60 configurations built from pure noise, with a true Sharpe of exactly zero in every one, and the best of them still comes out at 1.29 annualised. The best of 60 coin flips reaches about 1.37, so 1.29 is actually below what luck alone produces. On its own that number would pass most informal screening. The deflated Sharpe ratio works out that bar for however many things you tried and checks whether your result clears it.
 
 The second check splits your history in half every possible way, finds the best configuration in one half, and looks at where it ranks in the other. If the winner usually lands below the median of its peers then whatever is selecting it is not finding anything, and above 0.5 means you would have done better choosing at random.
 
@@ -17,8 +34,6 @@ The third one is different in kind. Both of the others ask whether your result b
 Reading the gradient is the point. In the figure above a trend follower earns 1.00 on the market that happened, collapses to 0.04 once the ordering is destroyed, and climbs back to 1.00 as the runs return. Buy and hold earns 0.36 and earns 0.38 shuffled, flat at every block length, because reordering a series cannot change its mean.
 
 It is easy to call the shuffled version noise and it is not. Shuffling keeps the mean, the variance, the skew and every fat tail exactly as they were, and only changes the order. That is why buy and hold does not notice. A strategy that dies under shuffling has shown its result needs the ordering, which fits a timing edge but also fits volatility targeting, sizing that reacts to recent variance, or a lookback bug. It narrows the question rather than settling it.
-
-## Using it
 
 ```python
 from overfitlab import (
@@ -37,7 +52,9 @@ path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60))
 
 Pass every configuration you tried, including the ones that did badly. Dropping those is the exact bias these numbers exist to catch.
 
-Install with `python -m pip install -e .` and you need Python 3.10 or newer with NumPy, pandas and SciPy. The demo runs the same maths in the browser with nothing to install, and its last panel takes a CSV of your own returns and reports both statistics without uploading anything. To run that locally it is `npm ci && npm run dev`.
+## Installing
+
+Install with `python -m pip install -e .` and you need Python 3.10 or newer with NumPy, pandas and SciPy. Everything the package does also runs in the browser demo with nothing installed, and to serve that locally it is `npm ci && npm run dev`.
 
 ## What it cannot do
 
