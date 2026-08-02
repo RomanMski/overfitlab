@@ -17,24 +17,25 @@ test("server-renders all four labs and the package section", async () => {
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /How much of your backtest is the search\?/);
-  assert.match(html, /What overfitting actually is/);
-  assert.match(html, /How searching manufactures a strategy/);
-  assert.match(html, /Or from Python/);
-  assert.match(html, /id="overfit"/);
-  assert.match(html, /id="search"/);
-  assert.match(html, /probability_of_backtest_overfitting/);
-  assert.match(html, /Nothing on this screen has any edge/);
 
-  // The explainer must reach the browser with a fitted curve already drawn,
-  // rather than an empty frame that only fills in after hydration.
-  assert.match(html, /Model flexibility/);
-  assert.match(html, /Configurations you tried/);
+  // The tool view is what renders on load. Concepts sit behind a tab, so their
+  // headings are present in the markup but the tool must come first.
+  assert.match(html, /How much of your backtest is the search\?/);
+  assert.match(html, /Make versions of your history to test against/);
+  assert.match(html, /Or hand over your trial results/);
+  assert.match(html, /Or from Python/);
+  assert.match(html, /id="generate"/);
+  assert.match(html, /write_datasets/);
+  assert.match(html, /Drop a CSV holding a price or return column/);
+  assert.match(html, /Generate and download/);
+
+  // Both tabs must reach the browser.
+  assert.match(html, /The tool<\/button>/);
+  assert.match(html, /Concepts<\/button>/);
 
   assert.ok(
-    html.indexOf("What overfitting actually is") <
-      html.indexOf("How searching manufactures a strategy"),
-    "the plain explanation should come before the backtesting one",
+    html.indexOf("Make versions of your history") < html.indexOf("Or from Python"),
+    "the generator should come before the package section",
   );
 
   assert.doesNotMatch(html, /—/);
