@@ -31,7 +31,11 @@
 \maketitle
 
 \begin{abstract}
-A backtest reports the best of everything you tried. That number is biased upward, and the size of the bias grows with how hard you searched. Two published corrections already exist for this, the deflated Sharpe ratio and the probability of backtest overfitting, and both are implemented here. Neither answers a second question that matters just as much, which is whether the market contains anything the strategy is reading. This paper describes a third diagnostic that speaks to it. The price history is resampled at a range of block lengths, from fully shuffled to almost intact, and the strategy is rerun on every resulting path. The resulting curve separates a timing edge, which dies when ordering is destroyed and returns as blocks lengthen, from a result that never depended on ordering at all. On a simulated market with genuine momentum a trend follower scores 1.00 annualised, falls to a median of 0.00 once the ordering is destroyed, and recovers as blocks lengthen. Buy and hold on the same market scores 0.36 at every block length, identical to within one floating point unit, because its result depends only on the multiset of returns. All three are packaged as an open library with a browser implementation that agrees with it to six decimal places.
+A backtest reports the best of everything you tried, and that number is biased upward by however hard you searched. Two published corrections exist for this and both are implemented here. Neither asks a second question that matters as much, which is whether the market held anything the strategy was reading at all.
+
+That question has an obvious experiment behind it. Destroy the ordering of the return series, rerun the strategy, and see what survives. The obvious implementation is a block bootstrap, and it is wrong. Resampling with replacement drops some observations and duplicates others, so the generated path has a different realised distribution from the source and the experiment varies two things at once. On a 1500 point series, one bootstrap path was missing 549 of the distinct source values and 79 of 200 paths had lost the largest loss entirely.
+
+A block permutation removes the confound. Every observation appears exactly once, so the empirical distribution is fixed by construction and only the arrangement varies. Sweeping the block length then separates a result that needs the ordering from one that would have happened in any ordering. On a simulated market with momentum, a trend follower earning 1.00 annualised falls to 0.00 once the ordering is destroyed and recovers as blocks lengthen, while buy and hold earns 0.36 at every block length, identical to within one floating point unit because its result depends only on the multiset of returns.
 \end{abstract}
 
 \section{The problem}
@@ -48,7 +52,11 @@ Both are implemented here and both are useful. Both also share a limitation. The
 
 The second question has a natural experiment behind it. A strategy that times entries is claiming that the order in which returns arrived carries information. That claim can be tested by destroying the order and seeing what remains.
 
-Let $r_{1:T}$ be the observed return series and let $A$ be a strategy mapping a return series to the returns it would have earned on it. Let $B_\ell$ cut the series into consecutive blocks of length $\ell$ and permute their order. Sampling without replacement matters here. Every observation appears exactly once in every generated path, so the empirical distribution is identical to the source and only the arrangement changes. The preserved quantity is the multiplicity of every observation, which is exact, so every order-invariant statistic is mathematically unchanged even though a recomputed sum can differ in its last bits. A block bootstrap in the sense of \citet{kunsch1989jackknife} or \citet{politis1994stationary} draws with replacement, so its paths drop some observations and duplicate others and their moments differ from the source. A strategy could then fail on them for reasons unrelated to sequence, which is exactly the confound this experiment is meant to remove. The bootstrap remains the right tool for interval estimation and the package implements it, but it is not what this diagnostic uses.
+Let $r_{1:T}$ be the observed return series and let $A$ be a strategy mapping a return series to the returns it would have earned on it. Let $B_\ell$ cut the series into consecutive blocks of length $\ell$ and permute their order.
+
+Sampling without replacement is the part that matters. Every observation appears exactly once in every generated path, so the empirical distribution is identical to the source and only the arrangement changes. What is preserved exactly is the multiplicity of each observation, which means every order-invariant statistic is mathematically unchanged, although a recomputed sum can still differ in its last bits because floating point addition is not associative.
+
+A block bootstrap in the sense of \citet{kunsch1989jackknife} or \citet{politis1994stationary} does not have that property, and Section~3 shows how far it departs from it in practice. The bootstrap remains the right tool for interval estimation and the package implements it. It is simply not what this diagnostic uses.
 
 At $\ell = 1$ the scheme reduces to a plain permutation. Every autocorrelation, every volatility cluster and every trend is gone, while the mean, the variance, the skewness and every individual extreme observation are exactly those of the original series. This is worth stating plainly because it is easy to describe the shuffled series as noise, and it is not. It is the same returns in a different order. At large $\ell$ most local structure survives as well.
 
@@ -63,7 +71,7 @@ alongside the observed $S_{\mathrm{obs}} = \mathrm{SR}(A(r_{1:T}))$. Reading $S_
 \end{equation}
 which is near one when the result vanishes under shuffling and near zero when shuffling changes nothing.
 
-$D$ is a descriptive summary and not a test statistic. It is undefined at $S_{\mathrm{obs}} = 0$, unstable when the observed Sharpe is small, and unbounded in both directions. No confidence interval or calibrated null is offered for it here. The curve $S_\ell$ is the object to read; $D$ only labels its left end.
+$D$ is a descriptive summary and not a test statistic. It is undefined at $S_{\mathrm{obs}} = 0$, unstable when the observed Sharpe is small, and unbounded in both directions. No confidence interval or calibrated null is offered for it here. The curve $S_\ell$ is the object to read. $D$ only labels its left end.
 
 \begin{figure}[t]
   \centering
@@ -82,11 +90,60 @@ Figure~\ref{fig:sweep} runs the sweep on a simulated market with mild genuine mo
 
 The trend follower holds yesterday's direction. On the observed path it earns 1.00 annualised. At $\ell = 1$ the median across generated markets is 0.00 and the observed result exceeds every one of the 300 paths. As $\ell$ grows the synthetic markets regain the persistence the strategy trades, the median climbs to 0.77, 0.91 and 0.93, and the observed result stops being exceptional. Its structure dependence is $D = 1.00$.
 
-This does not on its own establish a timing edge. A strategy whose exposure depends on recent realised variance, one with path-dependent position sizing, one with a lookback window that warms up differently on a reordered series, or one with an ordinary leakage bug will all collapse under shuffling in the same way. The sweep narrows the question from ``is this result real'' to ``this result requires the ordering, so what about the ordering is it using''. That is a smaller claim than it may first appear, and it is the claim the experiment supports.
+This does not on its own establish a timing edge. A strategy whose exposure depends on recent realised variance, one with path-dependent position sizing, one with a lookback window that warms up differently on a reordered series, or one with an ordinary leakage bug will all collapse under shuffling in the same way. The sweep narrows the question from ``is this result real'' to ``this result requires the ordering, so what about the ordering is it using''. That is the claim the experiment supports, and it is smaller than it first looks.
 
 Buy and hold earns 0.36 on the observed path and 0.36 at every block length, giving $D = 0.00$. The agreement is exact to within one floating point unit rather than approximate, because a permutation cannot change the multiset its result depends on. That is the correct answer rather than a failure of the method. Buy and hold earns from drift, drift is a property of the marginal distribution, and resampling preserves the marginal distribution exactly. A flat curve is informative. It says the result does not depend on when anything happened, which for a strategy that claims to time the market would be damning.
 
 The recovery at large $\ell$ deserves emphasis, because it is easy to misread. A strategy scoring well on synthetic markets at $\ell = 60$ has not failed a test. Those markets contain the structure it exploits, by construction, so it should score well there. The evidence is the gradient, not any single level.
+
+\section{Why the bootstrap is the wrong tool here}
+
+The first version of this diagnostic used a stationary bootstrap, on the
+reasoning that it is the standard resampling scheme for dependent data. That is
+true, and it is still the wrong choice for this particular experiment.
+
+A bootstrap draws with replacement. Some observations appear several times in a
+generated path and others do not appear at all, so the path has a different
+realised distribution from the source. Table~\ref{tab:bootstrap} measures the
+size of that effect on 1500 draws from a Student $t$ with three degrees of
+freedom, which is heavy tailed in roughly the way daily returns are.
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{lr}
+    \toprule
+    Measured over 200 bootstrap paths & \\
+    \midrule
+    Distinct source values absent from a single path & 549 of 1500 \\
+    Paths that lost the largest single loss entirely & 79 of 200 \\
+    Skewness, source & $+0.298$ \\
+    Skewness, one path & $+0.080$ \\
+    Standard deviation of the path means & $3.97\times10^{-4}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{How far a bootstrap path departs from the series it came from. The
+  experiment is supposed to vary only the ordering, and these quantities do not
+  depend on ordering at all.}
+  \label{tab:bootstrap}
+\end{table}
+
+Every quantity in that table is order-invariant, so none of it should move in an
+experiment about ordering. A strategy sensitive to tail behaviour could fail on
+a bootstrap path because the tail it needed was not drawn, and the result would
+be indistinguishable from a genuine dependence on sequence. That is the
+confound, and it is silent.
+
+The permutation removes it by construction rather than by argument. There is a
+sharp check available. Buy and hold depends only on the multiset of returns, so
+its Sharpe ratio cannot move under any reordering. Under the bootstrap it drifted
+from $0.36$ to $0.38$. Under the permutation it is unchanged to within one unit
+in the last place, which is the strongest available evidence that the generator
+does what it claims.
+
+The wider point is not about bootstraps. Any resampling scheme changes several
+properties of a series at once unless it is chosen not to, and a diagnostic is
+only as clean as the thing it holds fixed.
 
 \section{Implementation}
 
