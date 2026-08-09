@@ -249,6 +249,9 @@ test("the generated CSV holds the same doubles the source did", async () => {
   const awkward = [
     0.012345678901234567, -0.0987654321098765, 1e-17, -3.7e-9,
     0.1 + 0.2, -0.30000000000000004, 5.551115123125783e-17, 2 ** -53,
+    // String(-0) is "0", which parses back as +0 and is a different bit
+    // pattern, so the one value that needs special handling is in here.
+    -0, 0,
   ];
   const market = [...awkward, ...awkward, ...awkward, ...awkward];
   const rng = makeRng(17);

@@ -476,7 +476,6 @@ def path_stress(
     n_paths: int = 200,
     periods_per_year: int = 252,
     seed: int = 0,
-    scheme: str = "permutation",
     cost_bps: float = 0.0,
 ) -> PathStressResult:
     """Rerun ``strategy`` on synthetic markets built from ``market_returns``.
@@ -489,6 +488,17 @@ def path_stress(
     resulting gradient is the point: a timing edge should die at
     ``block_size = 1`` and recover as blocks lengthen. A result that survives
     the shuffle was never about timing.
+
+    This always permutes and takes no ``scheme``. It used to accept one, which
+    was a mistake. The whole interpretation offered here rests on the marginal
+    distribution being held fixed while the ordering varies, and the bootstrap
+    schemes do not hold it fixed, so a caller could ask for one and receive a
+    percentile, a p-value and a structure dependence that all read as though it
+    had. Nothing distinguished the two in the output. The bootstraps remain
+    exported as :func:`iid_bootstrap`, :func:`moving_block_bootstrap` and
+    :func:`stationary_bootstrap` for interval estimation, which is what they
+    are for, and :func:`generate_datasets` still takes a ``scheme`` because it
+    scores nothing and labels what it produced.
     """
 
     data = _as_returns(market_returns, name="market_returns")
@@ -517,7 +527,7 @@ def path_stress(
             block_sizes=(block,),
             n_paths=n_paths,
             seed=seed * 7919 + position,
-            scheme=scheme,
+            scheme="permutation",
         )[block]
 
         scores: list[float] = []
@@ -583,15 +593,27 @@ def generate_datasets(
     ``(n_paths, len(returns))``. Nothing is scored here and no strategy is
     involved. Take the arrays, run whatever you like on them, and compare.
 
-    Each block length answers a different question. At 1 the ordering is gone
-    and only the marginal distribution survives, so a model that still performs
-    there is not using time structure. At 60 runs of sixty periods stay intact.
-    Sweeping the range is more informative than picking one value.
+    Each block length answers a different question. At 1 no ordering survives.
+    At 60 runs of sixty periods stay intact. Sweeping the range is more
+    informative than picking one value.
 
-    Every value in every generated series appeared in the original. Resampling
-    reorders, so these are alternative arrangements of your history rather than
-    new observations, and they cannot tell you about behaviour your data never
-    contained.
+    What survives besides the ordering depends on ``scheme`` and the difference
+    matters. Under the default permutation every value in the original appears
+    exactly once in every generated series, so these are arrangements of your
+    history rather than new observations, and the mean, the variance, the skew
+    and every extreme are exactly those of the source. A model that performs
+    the same on them was not using time structure, because nothing else changed.
+
+    Under ``"stationary"`` or ``"moving"`` the blocks are drawn with
+    replacement. Values are duplicated and omitted, so those series are not
+    arrangements of your history and their moments differ from the source. A
+    model can then fail on them for reasons that have nothing to do with
+    ordering, which is why they are not the default and why
+    :func:`path_stress` does not offer them at all. They are here for callers
+    who want bootstrap inference and know that is what they are asking for.
+
+    In every case these are built from the data you supplied and can say
+    nothing about behaviour it never contained.
     """
 
     data = _as_returns(returns, name="returns")

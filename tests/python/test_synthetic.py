@@ -510,6 +510,31 @@ def test_written_values_survive_the_round_trip_to_text(tmp_path):
         assert (np.sort(column).tobytes() == source.tobytes())
 
 
+def test_path_stress_cannot_be_asked_for_a_bootstrap():
+    """The labels it prints are only true of the permutation.
+
+    It used to take a scheme. Asking for a bootstrap returned a percentile, a
+    p-value and a structure dependence that all read as though the marginal
+    distribution had been held fixed, when it had not, and nothing in the
+    output said so. The parameter is gone rather than documented.
+    """
+
+    import inspect
+
+    signature = inspect.signature(path_stress)
+    assert "scheme" not in signature.parameters
+
+    with pytest.raises(TypeError, match="scheme"):
+        path_stress(lambda values: values, ar1_market(300), scheme="stationary")
+
+    # And what it does print is true, because block 1 is always a permutation.
+    result = path_stress(
+        lambda values: values, ar1_market(400), block_sizes=(1,), n_paths=20, seed=1
+    )
+    assert "marginals kept" in result.summary_text()
+    assert result.levels[0]["percentile"] == pytest.approx(50.0, abs=1e-9)
+
+
 def test_the_manifest_only_claims_exactness_where_it_holds(tmp_path):
     """The note used to say "they are reorderings" for every scheme.
 

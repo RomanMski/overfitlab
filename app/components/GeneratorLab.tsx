@@ -51,9 +51,20 @@ function parseSeries(name: string, text: string): Series {
 }
 
 /**
+ * Serialise one value so it reads back as the identical double.
+ *
+ * String() gives the shortest such text for every value but one. It renders
+ * negative zero as "0", which parses back as +0 and is a different bit
+ * pattern. Nothing in a return series is likely to be -0, but the claim these
+ * files carry is exactness, and a claim with an exception is a weaker claim.
+ */
+function serialise(value: number): string {
+  return Object.is(value, -0) ? "-0" : String(value);
+}
+
+/**
  * Serialise the generated paths.
  *
- * String() gives the shortest text that reads back as the identical double.
  * toPrecision(10) was used here and it rounded, which quietly broke the one
  * claim these files exist to carry, that every observation from the source
  * appears in them unchanged.
@@ -62,7 +73,7 @@ export function toCsv(paths: number[][]): string {
   const header = paths.map((_, index) => `path_${index + 1}`).join(",");
   const lines = [header];
   for (let row = 0; row < paths[0].length; row += 1) {
-    lines.push(paths.map((path) => String(path[row])).join(","));
+    lines.push(paths.map((path) => serialise(path[row])).join(","));
   }
   return lines.join("\n");
 }
