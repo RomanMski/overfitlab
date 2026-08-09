@@ -33,7 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
-            texlive-science texlive-publishers biber
+            texlive-science texlive-publishers biber poppler-utils
 
       - name: Build the paper
         working-directory: paper
@@ -53,37 +53,21 @@ jobs:
             exit 1
           fi
 
+      # An empty pdfauthor silently drops the whole Info dictionary, which has
+      # happened here before, so the built PDF is asked what it actually says
+      # rather than trusting that the source still requests it.
       - name: Check the metadata survived
         working-directory: paper
         run: |
-          python3 - <<'PY'
-          import binascii, re, sys, zlib
-
-          data = open("main.pdf", "rb").read()
-          blobs = [data]
-          for match in re.finditer(rb"stream\r?\n", data):
-              start = match.end()
-              end = data.find(b"endstream", start)
-              if end > 0:
-                  try:
-                      blobs.append(zlib.decompress(data[start:end]))
-                  except Exception:
-                      pass
-
-          found = {}
-          for blob in blobs:
-              for hit in re.finditer(rb"/(\w+)\s*<([0-9A-Fa-f\s]+)>", blob):
-                  key = hit.group(1).decode()
-                  if key not in {"Author", "Title"}:
-                      continue
-                  raw = binascii.unhexlify(re.sub(rb"\s", b"", hit.group(2)))
-                  if raw.startswith(b"\xfe\xff"):
-                      found[key] = raw[2:].decode("utf-16-be", "replace")
-
-          print(found)
-          if "Roman" not in found.get("Author", ""):
-              sys.exit("the PDF lost its author metadata")
-          PY
+          pdfinfo main.pdf
+          if ! pdfinfo main.pdf | grep -qi '^Author:.*Roman'; then
+            echo "the PDF lost its author metadata"
+            exit 1
+          fi
+          if ! pdfinfo main.pdf | grep -qi '^Title:.*backtest'; then
+            echo "the PDF lost its title metadata"
+            exit 1
+          fi
 
       - name: Commit the rebuilt PDF
         if: github.event_name == 'push'
