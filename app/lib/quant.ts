@@ -363,6 +363,38 @@ export interface PathStressLevel {
   medianAnnualised: number;
   p95Annualised: number;
   percentile: number;
+  pValue: number;
+}
+
+/**
+ * Locate the real result inside the synthetic distribution. Mirrors
+ * `_rank_statistics` in the Python package.
+ *
+ * A strategy that ignores ordering scores the same on every generated path,
+ * and those scores differ from the real one only in the last bits, because
+ * the returns are summed in a different order. Counting strictly below turns
+ * that rounding into an arbitrary percentile, so ties are detected within a
+ * tolerance and split evenly.
+ */
+function rankStatistics(scores: number[], observed: number): { percentile: number; pValue: number } {
+  const tolerance = 1e-9 * Math.max(Math.abs(observed), 1);
+  let below = 0;
+  let tied = 0;
+  let atLeast = 0;
+  for (const score of scores) {
+    if (Math.abs(score - observed) <= tolerance) {
+      tied += 1;
+      atLeast += 1;
+    } else if (score < observed) {
+      below += 1;
+    } else {
+      atLeast += 1;
+    }
+  }
+  return {
+    percentile: (100 * (below + 0.5 * tied)) / scores.length,
+    pValue: (1 + atLeast) / (scores.length + 1),
+  };
 }
 
 /** Rerun a strategy on synthetic markets at several block lengths. */
@@ -385,6 +417,7 @@ export function pathStress(
     for (let path = 0; path < nPaths; path += 1) {
       scores.push(sharpe(strategy(blockPermutation(market, block, rng))));
     }
+    const ranks = rankStatistics(scores, observed);
     scores.sort((a, b) => a - b);
     const quantile = (q: number) =>
       scores[Math.min(scores.length - 1, Math.floor(q * scores.length))];
@@ -392,7 +425,8 @@ export function pathStress(
       blockSize: block,
       medianAnnualised: quantile(0.5) * annualiser,
       p95Annualised: quantile(0.95) * annualiser,
-      percentile: (scores.filter((s) => s < observed).length / scores.length) * 100,
+      percentile: ranks.percentile,
+      pValue: ranks.pValue,
     });
   }
   return { observedAnnualised: observed * annualiser, levels };
@@ -584,4 +618,31 @@ export function applyBlockOrder(
     throw new Error(`order must be a permutation of 0..${blocks.length - 1}`);
   }
   return order.flatMap((index) => blocks[index]);
+}
+
+/* ---------------------------------------------------------------------------
+ * Reading the two selection statistics together.
+ * ------------------------------------------------------------------------- */
+
+export type SelectionVerdict =
+  | "clears both"
+  | "fails both"
+  | "fails the luck bar"
+  | "unstable selection";
+
+/**
+ * Combine the deflated Sharpe ratio and the overfitting probability.
+ *
+ * Pulled out of the component so it can be tested. It was previously inline
+ * and compared the overfitting result object against a number rather than its
+ * `pbo` field, which is always false, so a set of trials that passed both
+ * checks was told its selection was unreliable.
+ */
+export function selectionVerdict(deflated: number, pbo: number): SelectionVerdict {
+  const survives = deflated >= 0.95;
+  const stable = pbo <= 0.5;
+  if (survives && stable) return "clears both";
+  if (!survives && !stable) return "fails both";
+  if (!survives) return "fails the luck bar";
+  return "unstable selection";
 }

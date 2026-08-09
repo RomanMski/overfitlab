@@ -334,12 +334,27 @@ class PathStressResult:
             1.0 - shuffled["median_sharpe"] / self.observed_sharpe
         )
 
+    def shuffled_p_value(self) -> float:
+        """How often the fully shuffled markets matched the real result.
+
+        The companion to structure dependence rather than a substitute for it.
+        Dependence measures how large the gap is and this measures how often
+        chance closes it, and the two can disagree. A strategy that is long
+        most of the time keeps most of its Sharpe under shuffling, so its
+        dependence is small, while still beating almost every arrangement.
+        """
+
+        if not self.levels:
+            return float("nan")
+        shuffled = min(self.levels, key=lambda level: level["block_size"])
+        return float(shuffled.get("p_value", float("nan")))
+
     def summary_text(self) -> str:
         lines = [
             f"Observed Sharpe {self.observed_annualised:.3f} annualised,"
             f" from {self.n_paths} synthetic paths per level",
             "",
-            "  block  keeps                       median  p95     the real result beats",
+            "  block  keeps                       median  p95     beats   p",
         ]
         for level in self.levels:
             block = int(level["block_size"])
@@ -352,20 +367,44 @@ class PathStressResult:
                 f"  {block:>5}  {keeps:<26}"
                 f"  {level['median_annualised']:>6.2f}"
                 f"  {level['p95_annualised']:>6.2f}"
-                f"  {level['percentile']:>5.1f}% of them"
+                f"  {level['percentile']:>5.1f}%"
+                f"  {level['p_value']:>5.3f}"
             )
         dependence = self.structure_dependence()
-        lines += ["", f"Structure dependence {dependence:.2f}"]
-        if dependence < 0.5:
+        p_value = self.shuffled_p_value()
+        lines += [
+            "",
+            f"Structure dependence {dependence:.2f}, shuffled p-value {p_value:.3f}",
+        ]
+        # These two answer different questions and a strategy can score low on
+        # one and high on the other, so neither is allowed to speak alone.
+        large = dependence >= 0.5
+        rare = p_value <= 0.05
+        if large and rare:
             lines.append(
-                "  The strategy does nearly as well on shuffled returns, so it is"
-                " not earning this from timing."
+                "  Most of the result disappears once ordering is destroyed and"
+                " the arrangements rarely match it. Consistent with a timing"
+                " edge, and also with volatility targeting, path-dependent"
+                " sizing or a lookback bug."
+            )
+        elif rare:
+            lines.append(
+                "  The strategy keeps most of its result under shuffling, so"
+                " the ordering is not where the size of it comes from, but"
+                " the arrangements rarely match it. A small edge on top of"
+                " exposure the shuffling cannot remove looks like this."
+            )
+        elif large:
+            lines.append(
+                "  The gap is wide but the arrangements reach it often enough"
+                " that chance is not ruled out. Usually a Sharpe near zero,"
+                " where dependence is a ratio of two small numbers."
             )
         else:
             lines.append(
-                "  Most of the result disappears once ordering is destroyed."
-                " Consistent with a timing edge, and also with volatility"
-                " targeting, path-dependent sizing or a lookback bug."
+                "  The strategy does nearly as well on shuffled returns and the"
+                " arrangements match it often, so it is not earning this from"
+                " ordering."
             )
         return "\n".join(lines)
 
@@ -397,6 +436,32 @@ def _strategy_returns(
             "(returns, positions) pair to use them."
         )
     return net
+
+
+def _rank_statistics(values: np.ndarray, observed: float) -> tuple[float, float]:
+    """Locate the real result inside the synthetic distribution.
+
+    Ties are the reason this is not one line. A strategy whose result does not
+    depend on ordering scores the same on every generated path, and those
+    scores then differ from the real one only in the last bits, because the
+    returns are summed in a different order. Counting strictly below turns that
+    rounding into a percentile anywhere between 0 and 100, so buy and hold on
+    real data reported 23 on one series and 11 on another when the only
+    truthful answer is 50. Anything within a tolerance of the real result is
+    treated as the tie it is and split evenly.
+
+    The p-value is the usual conservative permutation form. The real series is
+    itself one of the arrangements being compared, which is what the extra
+    count in the numerator and denominator accounts for.
+    """
+
+    tolerance = 1e-9 * max(abs(observed), 1.0)
+    below = int(np.count_nonzero(values < observed - tolerance))
+    tied = int(np.count_nonzero(np.abs(values - observed) <= tolerance))
+    percentile = 100.0 * (below + 0.5 * tied) / values.size
+    at_least = int(np.count_nonzero(values >= observed - tolerance))
+    p_value = (1.0 + at_least) / (values.size + 1.0)
+    return percentile, p_value
 
 
 def path_stress(
@@ -443,7 +508,6 @@ def path_stress(
     levels: list[dict[str, float]] = []
 
     for position, block in enumerate(blocks):
-        level_seed = seed * 1_000_003 + position
         paths = generate_datasets(
             data,
             block_sizes=(block,),
@@ -477,6 +541,7 @@ def path_stress(
             continue
 
         values = np.asarray(scores, dtype=float)
+        percentile, p_value = _rank_statistics(values, observed)
         levels.append(
             {
                 "block_size": float(block),
@@ -486,7 +551,8 @@ def path_stress(
                 "p95_annualised": float(np.quantile(values, 0.95) * annualiser),
                 "mean_annualised": float(np.mean(values) * annualiser),
                 # How much of the synthetic distribution the real result beats.
-                "percentile": float(100.0 * np.mean(values < observed)),
+                "percentile": percentile,
+                "p_value": p_value,
             }
         )
 

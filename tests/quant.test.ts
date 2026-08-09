@@ -10,10 +10,12 @@ import {
   makeRng,
   normalDraws,
   normInv,
+  pathStress,
   polynomialFit,
   rootMeanSquaredError,
   sampleOverfitData,
   searchSnapshot,
+  selectionVerdict,
   sharpe,
   trueFunction,
 } from "../app/lib/quant.ts";
@@ -198,4 +200,43 @@ test("blockPermutation keeps the multiset at awkward block sizes", () => {
       assert.deepEqual([...got].sort((a, b) => a - b), sorted, `n=${n} block=${block}`);
     }
   }
+});
+
+test("pathStress puts an order invariant strategy in the middle, not anywhere", () => {
+  // Buy and hold scores the same on every arrangement, so the synthetic
+  // scores differ from the real one only in the last bits of a sum taken in a
+  // different order. Counting strictly below turned that rounding into a
+  // percentile of 23 on one real series and 11 on another. Ties are ties.
+  const market = autocorrelatedMarket(11, 1200, 0.25);
+  const result = pathStress((values) => values, market, [1, 20], 200, 7);
+  for (const level of result.levels) {
+    assert.ok(
+      Math.abs(level.percentile - 50) < 1e-9,
+      `block ${level.blockSize} reported ${level.percentile}`,
+    );
+    assert.ok(Math.abs(level.pValue - 1) < 1e-9);
+    assert.ok(Math.abs(level.medianAnnualised - result.observedAnnualised) < 1e-9);
+  }
+});
+
+test("pathStress finds the timing edge it is supposed to find", () => {
+  const market = autocorrelatedMarket(3, 1500, 0.35);
+  const momentum = (values: number[]) =>
+    values.slice(1).map((value, i) => Math.sign(values[i]) * value);
+  const result = pathStress(momentum, market, [1], 200, 9);
+  assert.ok(result.observedAnnualised > 0.5);
+  assert.ok(result.levels[0].percentile > 90);
+  assert.ok(result.levels[0].pValue < 0.1);
+});
+
+test("the selection verdict reads both statistics, not one", () => {
+  // The component compared the overfitting result object against a number
+  // instead of its pbo field. That is always false, so trials that passed
+  // both checks were told the selection was unreliable.
+  assert.equal(selectionVerdict(0.99, 0.10), "clears both");
+  assert.equal(selectionVerdict(0.10, 0.90), "fails both");
+  assert.equal(selectionVerdict(0.10, 0.10), "fails the luck bar");
+  assert.equal(selectionVerdict(0.99, 0.90), "unstable selection");
+  // The boundaries are inclusive on the passing side.
+  assert.equal(selectionVerdict(0.95, 0.5), "clears both");
 });

@@ -24,5 +24,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build and run browser checks
         run: npm test

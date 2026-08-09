@@ -1,0 +1,105 @@
+name: Paper
+
+# The PDF is tracked in the repository because people read it without cloning,
+# and a tracked build artefact drifts from its source unless something checks.
+# This rebuilds it from main.tex and commits the result when it changed, so the
+# PDF cannot quietly disagree with the LaTeX it came from.
+
+on:
+  push:
+    paths:
+      - "paper/**"
+      - "docs/images/**"
+      - ".github/workflows/paper.yml"
+  pull_request:
+    paths:
+      - "paper/**"
+      - "docs/images/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+            texlive-science texlive-publishers biber
+
+      - name: Build the paper
+        working-directory: paper
+        run: |
+          set -e
+          pdflatex -halt-on-error -interaction=nonstopmode main.tex
+          bibtex main
+          pdflatex -halt-on-error -interaction=nonstopmode main.tex
+          pdflatex -halt-on-error -interaction=nonstopmode main.tex
+
+      - name: Fail on unresolved references
+        working-directory: paper
+        run: |
+          if grep -q "undefined" main.log; then
+            grep -n "undefined" main.log
+            echo "the paper has undefined references or citations"
+            exit 1
+          fi
+
+      - name: Check the metadata survived
+        working-directory: paper
+        run: |
+          python3 - <<'PY'
+          import binascii, re, sys, zlib
+
+          data = open("main.pdf", "rb").read()
+          blobs = [data]
+          for match in re.finditer(rb"stream\r?\n", data):
+              start = match.end()
+              end = data.find(b"endstream", start)
+              if end > 0:
+                  try:
+                      blobs.append(zlib.decompress(data[start:end]))
+                  except Exception:
+                      pass
+
+          found = {}
+          for blob in blobs:
+              for hit in re.finditer(rb"/(\w+)\s*<([0-9A-Fa-f\s]+)>", blob):
+                  key = hit.group(1).decode()
+                  if key not in {"Author", "Title"}:
+                      continue
+                  raw = binascii.unhexlify(re.sub(rb"\s", b"", hit.group(2)))
+                  if raw.startswith(b"\xfe\xff"):
+                      found[key] = raw[2:].decode("utf-16-be", "replace")
+
+          print(found)
+          if "Roman" not in found.get("Author", ""):
+              sys.exit("the PDF lost its author metadata")
+          PY
+
+      - name: Commit the rebuilt PDF
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- paper/main.pdf; then
+            echo "the PDF was already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add paper/main.pdf
+          git commit -m "Rebuild the paper PDF from main.tex"
+          git push
+
+      - name: Upload the PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper/main.pdf

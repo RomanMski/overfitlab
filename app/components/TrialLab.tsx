@@ -6,8 +6,20 @@ import {
   deflatedSharpe,
   generateNoiseTrials,
   probabilityOfBacktestOverfitting,
+  selectionVerdict,
   sharpe,
 } from "../lib/quant";
+
+const VERDICTS = {
+  "clears both":
+    "Selection alone does not explain this result. That is the strongest thing these statistics can say, and it is not the same as an edge.",
+  "fails both":
+    "The best result does not clear what your number of trials reaches by luck, and the winner usually underperforms out of sample. Both statistics point the same way.",
+  "fails the luck bar":
+    "The best result does not clear the bar set by how many configurations you tried.",
+  "unstable selection":
+    "The result clears the luck bar, but the in-sample winner lands below the median out of sample more often than not, so the selection itself is unreliable.",
+} as const;
 
 interface Loaded {
   name: string;
@@ -92,21 +104,9 @@ export function TrialLab() {
     }
   };
 
-  const verdict = (() => {
-    if (!report) return null;
-    const survives = report.deflated.deflated >= 0.95;
-    const stable = report.pbo <= 0.5;
-    if (survives && stable) {
-      return "Selection alone does not explain this result. That is the strongest thing these statistics can say, and it is not the same as an edge.";
-    }
-    if (!survives && !stable) {
-      return "The best result does not clear what your number of trials reaches by luck, and the winner usually underperforms out of sample. Both statistics point the same way.";
-    }
-    if (!survives) {
-      return "The best result does not clear the bar set by how many configurations you tried.";
-    }
-    return "The result clears the luck bar, but the in-sample winner lands below the median out of sample more often than not, so the selection itself is unreliable.";
-  })();
+  const verdict = report
+    ? VERDICTS[selectionVerdict(report.deflated.deflated, report.pbo.pbo)]
+    : null;
 
   return (
     <div className="tl">

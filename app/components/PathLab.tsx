@@ -147,12 +147,16 @@ export function PathLab() {
           <span>Real result beats</span>
           <strong>{level.percentile.toFixed(0)}%</strong>
         </div>
+        <div className="pl-stat">
+          <span>Arrangements matching it</span>
+          <strong>{level.pValue.toFixed(3)}</strong>
+        </div>
       </div>
 
       <p>
         {useMomentum
           ? "The trend follower makes its money from the market's tendency to keep going. Drag to block 1 and that tendency is gone. The strategy collapses to about zero, and the real result beats nearly all the synthetic markets. Widen the blocks and the persistence comes back, so the synthetic markets support the strategy too and the real result stops looking special. That gradient is the evidence. It shows the result needs the ordering, which is consistent with a timing edge and also with volatility targeting or a lookback bug, so it narrows the question rather than closing it."
-          : "Buy and hold makes its money from drift, not timing. Reordering returns cannot change their mean or their spread. So the synthetic markets pay almost exactly what the real one did, at every block size. The flat line across the slider is the tell. Nothing here depends on what order things happened in."}
+          : "Buy and hold makes its money from drift, not timing. Reordering returns cannot change their mean or their spread. So the synthetic markets pay exactly what the real one did, at every block size, and the real result lands at the 50th percentile with every arrangement matching it. The flat line across the slider is the tell. Nothing here depends on what order things happened in."}
       </p>
     </div>
   );

@@ -56,3 +56,6 @@ pytest-cache-files-*/
 *.blg
 *.log
 *.out
+
+# Downloaded market data, not redistributed. scripts/real_data.py fetches it.
+/data/

@@ -76,7 +76,8 @@ export function GeneratorLab() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const example = useMemo(
-    () => ({ name: "example series, 900 periods", values: autocorrelatedMarket(7, 900, 0.2) }),
+    // The length is printed alongside the name, so it does not belong in it.
+    () => ({ name: "example series", values: autocorrelatedMarket(7, 900, 0.2) }),
     [],
   );
   const active = series ?? example;

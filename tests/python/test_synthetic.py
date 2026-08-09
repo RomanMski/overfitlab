@@ -12,6 +12,7 @@ from overfitlab import (
     path_stress,
     stationary_bootstrap,
 )
+from overfitlab.synthetic import PathStressResult
 
 
 def autocorrelation(values: np.ndarray, lag: int = 1) -> float:
@@ -169,6 +170,59 @@ def test_percentile_places_the_real_result_in_the_synthetic_distribution():
     )
     # A genuine edge should beat almost every shuffled market.
     assert result.levels[0]["percentile"] > 90.0
+    assert result.levels[0]["p_value"] < 0.1
+
+
+def test_an_order_invariant_strategy_sits_in_the_middle_rather_than_anywhere():
+    """Ties must be split, not resolved by floating point rounding.
+
+    Buy and hold scores identically on every arrangement, so the synthetic
+    scores differ from the real one only in the last bits of a sum taken in a
+    different order. Counting strictly below made this report 23 on one real
+    series and 11 on another. The only truthful answer is the middle.
+    """
+
+    market = ar1_market(1500, phi=0.35, seed=23)
+    result = path_stress(
+        lambda values: values, market, block_sizes=(1, 20), n_paths=200, seed=5
+    )
+    for level in result.levels:
+        assert level["percentile"] == pytest.approx(50.0, abs=1e-9)
+        # Every arrangement matches it, so nothing here is rare.
+        assert level["p_value"] == pytest.approx(1.0, abs=1e-9)
+
+
+def test_a_small_but_rare_effect_is_not_dismissed_by_the_summary():
+    """Volatility targeting on SPY had dependence 0.21 and a p-value of 0.002.
+
+    The ratio is small because the strategy is long most of the time and keeps
+    that exposure under shuffling. Branching on the ratio alone printed that it
+    was not earning anything from ordering, while the arrangements almost never
+    reached it. Both numbers have to speak.
+    """
+
+    result = PathStressResult(
+        observed_sharpe=0.0384,
+        periods_per_year=252,
+        n_paths=400,
+        levels=(
+            {
+                "block_size": 1.0,
+                "n_paths": 400.0,
+                "median_sharpe": 0.0303,
+                "median_annualised": 0.49,
+                "p95_annualised": 0.58,
+                "mean_annualised": 0.49,
+                "percentile": 97.2,
+                "p_value": 0.0025,
+            },
+        ),
+    )
+    assert result.structure_dependence() == pytest.approx(0.21, abs=0.01)
+    assert result.shuffled_p_value() == pytest.approx(0.0025)
+    text = result.summary_text()
+    assert "the arrangements rarely match it" in text
+    assert "not earning this from ordering" not in text
 
 
 def test_failing_strategies_are_recorded_rather_than_swallowed():
