@@ -35,7 +35,7 @@ A backtest reports the best of everything you tried, and that number is biased u
 
 That question has an obvious experiment behind it. Destroy the ordering of the return series, rerun the strategy, and see what survives. The obvious implementation is a block bootstrap, and it is wrong. Resampling with replacement drops some observations and duplicates others, so the generated path has a different realised distribution from the source and the experiment varies two things at once. On a 1500 point series, one bootstrap path was missing 549 of the distinct source values and 79 of 200 paths had lost the largest loss entirely.
 
-A block permutation removes the confound. Every observation appears exactly once, so the empirical distribution is fixed by construction and only the arrangement varies. Sweeping the block length then separates a result that needs the ordering from one that would have happened in any ordering. On a simulated market with momentum, a trend follower earning 1.00 annualised falls to 0.00 once the ordering is destroyed and recovers as blocks lengthen, while buy and hold earns 0.36 at every block length, identical to within one floating point unit because its result depends only on the multiset of returns.
+A block permutation removes the confound. Every observation appears exactly once, so the empirical distribution is fixed by construction and only the arrangement varies. Sweeping the block length then separates a result that needs the ordering from one that would have happened in any ordering. On a simulated market with momentum, a trend follower earning 1.00 annualised falls to 0.00 once the ordering is destroyed and recovers as blocks lengthen, while buy and hold returns the source value at every block length to within one floating point unit, because its result depends only on the multiset of returns and a permutation cannot change that. Under a bootstrap the same quantity scatters with a standard deviation roughly as large as itself.
 \end{abstract}
 
 \section{The problem}
@@ -134,12 +134,31 @@ a bootstrap path because the tail it needed was not drawn, and the result would
 be indistinguishable from a genuine dependence on sequence. That is the
 confound, and it is silent.
 
-The permutation removes it by construction rather than by argument. There is a
-sharp check available. Buy and hold depends only on the multiset of returns, so
-its Sharpe ratio cannot move under any reordering. Under the bootstrap it drifted
-from $0.36$ to $0.38$. Under the permutation it is unchanged to within one unit
-in the last place, which is the strongest available evidence that the generator
-does what it claims.
+The permutation removes the confound by construction rather than by argument, and
+there is a sharp check available. Buy and hold depends only on the multiset of
+returns, so its Sharpe ratio is a deterministic function of the data and cannot
+move under any reordering. It is therefore a quantity whose correct behaviour is
+known exactly in advance.
+
+Over 4000 generated paths of a 2500 point series, the permutation returns the
+source value every time, with a standard deviation of $1.6\times10^{-16}$. The
+bootstrap returns a mean of $0.347$ against a source of $0.342$, which is $1.1$
+standard errors and therefore consistent with no bias at all. The problem is not
+the location. It is the spread. The bootstrap estimates scatter with a standard
+deviation of $0.314$ on a quantity of $0.342$, so the noise it injects is the
+same size as the thing being measured, into a statistic that cannot vary. Any
+strategy tested this way inherits that noise, and a result can look dependent on
+ordering when the ordering was never what moved it.
+
+This is a trade and not a free improvement. The geometric block length in
+\citet{politis1994stationary} exists to keep the resampled series stationary, and
+permuting fixed blocks does not have that property. Permutation also joins blocks
+that were never adjacent, which introduces discontinuities at the seams and
+destroys dependence that spanned them. What is bought is an exactly fixed
+marginal distribution. For a diagnostic whose entire question is whether
+ordering matters, holding the distribution fixed is worth more than keeping the
+path stationary. For interval estimation the ranking reverses, which is why the
+package implements both.
 
 The wider point is not about bootstraps. Any resampling scheme changes several
 properties of a series at once unless it is chosen not to, and a diagnostic is

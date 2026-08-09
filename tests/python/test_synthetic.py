@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from overfitlab import (
+    block_permutation,
     iid_bootstrap,
     moving_block_bootstrap,
     path_stress,
@@ -515,3 +516,35 @@ def test_apply_costs_charges_each_change_in_position():
     # Traded amounts: 1 to open, 0, 2 to flip, 1 to close.
     net = apply_costs(returns, positions, 100.0)  # 100 bps = 1%
     assert net == pytest.approx([-0.01, 0.0, -0.02, -0.01])
+
+
+def test_the_bootstrap_injects_variance_into_a_deterministic_quantity():
+    """The argument the paper actually makes, asserted.
+
+    Buy and hold's Sharpe is a function of the multiset of returns, so under a
+    permutation it is deterministic. The bootstrap is not biased here, its mean
+    sits within a couple of standard errors of the source. What it does is
+    scatter a quantity that cannot move, by an amount comparable to the
+    quantity itself, and any strategy tested that way inherits that noise.
+    """
+
+    rng = np.random.default_rng(1)
+    market = rng.normal(loc=0.0004, scale=0.011, size=2500)
+    source = market.mean() / market.std(ddof=1)
+
+    def sharpes(paths):
+        return paths.mean(axis=1) / paths.std(axis=1, ddof=1)
+
+    permuted = sharpes(block_permutation(market, 2000, block_size=1, seed=2))
+    bootstrapped = sharpes(iid_bootstrap(market, 2000, seed=2))
+
+    # Deterministic under permutation.
+    assert permuted.std() < 1e-12
+    assert permuted.mean() == pytest.approx(source, abs=1e-12)
+
+    # Not biased under the bootstrap, within three standard errors.
+    standard_error = bootstrapped.std() / np.sqrt(bootstrapped.size)
+    assert abs(bootstrapped.mean() - source) < 3 * standard_error
+
+    # But scattered by an amount comparable to the quantity itself.
+    assert bootstrapped.std() > 0.5 * abs(source)
