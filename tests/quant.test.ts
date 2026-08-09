@@ -240,3 +240,28 @@ test("the selection verdict reads both statistics, not one", () => {
   // The boundaries are inclusive on the passing side.
   assert.equal(selectionVerdict(0.95, 0.5), "clears both");
 });
+
+test("the generated CSV holds the same doubles the source did", async () => {
+  // toPrecision(10) was used here and it rounded on the way out, so the file
+  // the demo hands you was not the multiset it promised.
+  const { toCsv } = await import("../app/components/GeneratorLab.tsx");
+
+  const awkward = [
+    0.012345678901234567, -0.0987654321098765, 1e-17, -3.7e-9,
+    0.1 + 0.2, -0.30000000000000004, 5.551115123125783e-17, 2 ** -53,
+  ];
+  const market = [...awkward, ...awkward, ...awkward, ...awkward];
+  const rng = makeRng(17);
+  const paths = Array.from({ length: 4 }, () => blockPermutation(market, 2, rng));
+
+  const rows = toCsv(paths).split("\n").slice(1).map((line) => line.split(","));
+  const source = [...market].sort((a, b) => a - b);
+  for (let column = 0; column < paths.length; column += 1) {
+    const parsed = rows.map((row) => Number(row[column])).sort((a, b) => a - b);
+    // Object.is so that a sign flip on zero would also count as a change.
+    assert.ok(
+      parsed.every((value, i) => Object.is(value, source[i])),
+      `column ${column} did not survive the round trip`,
+    );
+  }
+});

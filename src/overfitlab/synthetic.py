@@ -28,10 +28,14 @@ each. The interesting control is *how much structure the resampling keeps*:
 Sweeping the block size therefore tells you *what* the strategy depends on,
 rather than only whether it works. That gradient is the point of this module.
 
-The generators are the standard resampling schemes for dependent data, with
-the stationary bootstrap of Politis and Romano (1994) as the default because
-its geometric block lengths leave the resampled series stationary, which fixed
-blocks do not.
+The generators are the standard resampling schemes for dependent data. The
+default is a block permutation rather than one of them, because this module
+asks whether ordering matters and a permutation is the only scheme that holds
+the marginal distribution exactly fixed while the ordering changes. That is a
+trade rather than a free improvement. The geometric block lengths of the
+stationary bootstrap of Politis and Romano (1994) leave the resampled series
+stationary, which permuting fixed blocks does not, so for interval estimation
+the ranking reverses. Both are implemented and ``scheme`` selects between them.
 """
 
 from __future__ import annotations
@@ -641,6 +645,13 @@ def write_datasets(
     One file per block length, each column a generated path. The manifest
     records the settings and a hash of the input so a result can be traced back
     to the series it came from.
+
+    Values are written with ``repr``, which is the shortest string that reads
+    back as the identical double. This matters more here than it looks. The
+    permutation preserves the multiset exactly, and the whole point of these
+    files is that a model runs on them, so rounding on the way out would break
+    the claim at the only place a user actually sees it. An earlier version
+    wrote ten significant figures and quietly lost the last few bits.
     """
 
     import csv
@@ -666,20 +677,36 @@ def write_datasets(
             writer = csv.writer(handle)
             writer.writerow([f"path_{index + 1}" for index in range(paths.shape[0])])
             for row in paths.T:
-                writer.writerow([f"{value:.10g}" for value in row])
+                writer.writerow([repr(float(value)) for value in row])
         files.append({"file": name, "block_size": block, "n_paths": int(paths.shape[0])})
+
+    # The exactness claim belongs to the permutation and to nothing else, so
+    # the manifest must not repeat it for a scheme that draws with replacement.
+    if scheme == "permutation":
+        note = (
+            "Every value in the source appears exactly once in every generated "
+            "series. These are reorderings, not new observations. The mean, the "
+            "variance, the skew and the extremes are identical to the source "
+            "and only the order changes, so they carry no information the "
+            "source did not already contain."
+        )
+    else:
+        note = (
+            f"Generated with the {scheme} bootstrap, which draws with "
+            "replacement. A generated series can therefore duplicate some "
+            "observations and omit others, and its mean, variance, skew and "
+            "extremes will differ from the source. Use scheme='permutation' if "
+            "you need the distribution held fixed while only the order changes."
+        )
 
     manifest = {
         "source_periods": int(data.size),
         "source_fingerprint": digest,
         "seed": int(seed),
         "scheme": scheme,
+        "preserves_multiset": scheme == "permutation",
         "files": files,
-        "note": (
-            "Every value in these files appeared in the source series. They are "
-            "reorderings, not new observations, and they carry no information "
-            "the source did not already contain."
-        ),
+        "note": note,
     }
     with open(os.path.join(directory, "manifest.json"), "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2)

@@ -212,7 +212,7 @@ Behaviour is tested rather than snapshotted. The suite asserts that independent 
 
 \textbf{Volatility clustering survives only within blocks.} Real markets show persistence in volatility that outlives any practical block length, so the synthetic paths are calmer in the tails than the series they came from. A filtered resampling scheme that models conditional variance explicitly would improve this and is not implemented.
 
-\textbf{No transaction costs.} A strategy trading at daily frequency can lose most of a 1.00 Sharpe ratio to spread and slippage. None of these measurements will register that, and a structure-dependence result says nothing about whether the edge survives execution.
+\textbf{Costs are charged crudely and only on request.} The sweep accepts a rate in basis points and charges it against turnover, which requires the strategy to report its positions and is off by default. A flat rate is the crudest possible model. Real cost rises with size and worsens in the volatile periods a strategy is most likely to be trading, so a result that survives a flat charge has not been shown to survive execution. The two selection statistics take whatever return series they are given and will report on gross figures as readily as net ones.
 
 \textbf{Five series is not a study.} Section~\ref{sec:real} uses real prices but tests four fixed strategies on five instruments in one asset class each. It is enough to demonstrate that the two summaries disagree in practice and to verify the exactness claim on real returns. It is not a survey of when they disagree, and no correction for testing four strategies on five series is applied to the p-values reported there.
 

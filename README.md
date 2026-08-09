@@ -84,7 +84,7 @@ On a simulated market with real momentum, that trend follower earns 4.23 annuali
 
 Setting `cost_bps` on a strategy that returns only its returns raises rather than reporting a gross figure as though it were net.
 
-Costs also change how the sweep reads. Structure dependence can exceed one, which means the shuffled markets turn the strategy negative, because there it pays to trade on structure that is no longer present.
+Costs also change how the sweep reads. Structure dependence can exceed one, which happens whenever the shuffled median falls on the opposite side of zero from the observed result. Charging costs is one route to it, because a strategy that trades on structure the shuffled market no longer has still pays to trade. A losing strategy is the other route, and it is the more common one. The one day trend follower in the real data run is negative on every series and less negative on the shuffles, which puts its dependence above one without any costs involved. Read the sign of both numbers before reading the ratio.
 
 ## Installing
 
@@ -98,7 +98,9 @@ Both selection statistics assume your trials are roughly interchangeable draws. 
 
 The overfitting probability ignores time order entirely. It draws combinations of blocks without caring which came first, so a strategy that worked until the regime changed and then stopped looks fine to it. That is how the published method works, and it is why it is not reported on its own here.
 
-Permuting keeps volatility clustering inside a block and loses it across the joins, so the generated paths cluster less than the series they came from even though their marginal distribution is identical. Nothing anywhere models transaction costs, and a strategy trading daily can lose most of a 1.00 Sharpe to spread and slippage without any of these numbers noticing.
+Permuting keeps volatility clustering inside a block and loses it across the joins, so the generated paths cluster less than the series they came from even though their marginal distribution is identical.
+
+Costs are charged only where you supply positions and a rate. `path_stress` takes `cost_bps`, and the two selection statistics take whatever returns you hand them, so if those are gross then their answer is about a gross strategy. A daily trader can lose most of a 1.00 Sharpe to spread and slippage, and nothing here will notice unless you charge for it. The charge itself is a flat rate on turnover, which ignores that costs rise with size and worsen in exactly the volatile stretches a strategy tends to trade.
 
 Structure dependence is a ratio of two Sharpes and it inherits every problem that implies. It is unstable when the observed Sharpe is near zero, it carries no confidence interval, and on real data it flattered a trend follower that could not clear chance while hiding a volatility targeting result that could. Read it next to the p-value or not at all.
 

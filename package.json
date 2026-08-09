@@ -10,7 +10,8 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && node --import tsx --test tests/rendered-html.test.mjs tests/quant.test.ts",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prebuild": "node scripts/sync_paper.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

@@ -50,11 +50,19 @@ function parseSeries(name: string, text: string): Series {
   return { name, values: best };
 }
 
-function toCsv(paths: number[][]): string {
+/**
+ * Serialise the generated paths.
+ *
+ * String() gives the shortest text that reads back as the identical double.
+ * toPrecision(10) was used here and it rounded, which quietly broke the one
+ * claim these files exist to carry, that every observation from the source
+ * appears in them unchanged.
+ */
+export function toCsv(paths: number[][]): string {
   const header = paths.map((_, index) => `path_${index + 1}`).join(",");
   const lines = [header];
   for (let row = 0; row < paths[0].length; row += 1) {
-    lines.push(paths.map((path) => path[row].toPrecision(10)).join(","));
+    lines.push(paths.map((path) => String(path[row])).join(","));
   }
   return lines.join("\n");
 }

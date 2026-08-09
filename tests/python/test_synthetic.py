@@ -463,10 +463,94 @@ def test_write_datasets_round_trips_to_disk(tmp_path):
     assert header == [f"path_{index + 1}" for index in range(6)]
     assert len(body) == 300
 
-    # Every written column has to be a rearrangement of the source.
+    # Every written column has to be a rearrangement of the source, and
+    # rearrangement means bit for bit. allclose was used here and it permitted
+    # a formatting change that silently rounded the values on the way out,
+    # which is exactly the claim these files are supposed to carry.
+    source = np.sort(market)
     columns = np.array([[float(cell) for cell in row] for row in body]).T
     for column in columns:
-        assert np.allclose(np.sort(column), np.sort(market))
+        assert np.array_equal(np.sort(column), source)
+
+
+def test_written_values_survive_the_round_trip_to_text(tmp_path):
+    """A CSV a user runs their model on must hold the same numbers.
+
+    Ten significant figures looks like plenty and is not. These are awkward
+    doubles chosen so that any fixed-width format loses at least one of them.
+    """
+
+    import csv
+
+    from overfitlab import write_datasets
+
+    market = np.array(
+        [
+            0.012345678901234567,
+            -0.0987654321098765,
+            1e-17,
+            -3.7e-9,
+            0.1 + 0.2,
+            np.nextafter(0.01, 1.0),
+            -0.30000000000000004,
+            5.551115123125783e-17,
+        ]
+        * 8
+    )
+    write_datasets(market, str(tmp_path), block_sizes=(2,), n_paths=4, seed=1)
+
+    with (tmp_path / "block-002.csv").open(encoding="utf-8") as handle:
+        body = list(csv.reader(handle))[1:]
+
+    columns = np.array([[float(cell) for cell in row] for row in body]).T
+    source = np.sort(market)
+    for column in columns:
+        assert np.array_equal(np.sort(column), source)
+        # Not merely close. Every bit of every value came back.
+        assert (np.sort(column).tobytes() == source.tobytes())
+
+
+def test_the_manifest_only_claims_exactness_where_it_holds(tmp_path):
+    """The note used to say "they are reorderings" for every scheme.
+
+    That is true of the permutation and false of both bootstraps, which draw
+    with replacement and so duplicate and omit observations.
+    """
+
+    import csv
+
+    from overfitlab import write_datasets
+
+    market = np.random.default_rng(3).normal(scale=0.01, size=240)
+    source = np.sort(market)
+
+    def written_columns(directory) -> np.ndarray:
+        with (directory / "block-005.csv").open(encoding="utf-8") as handle:
+            body = list(csv.reader(handle))[1:]
+        return np.array([[float(cell) for cell in row] for row in body]).T
+
+    exact = tmp_path / "exact"
+    manifest = write_datasets(
+        market, str(exact), block_sizes=(5,), n_paths=8, seed=4, scheme="permutation"
+    )
+    assert manifest["preserves_multiset"] is True
+    assert "exactly once" in manifest["note"]
+    for column in written_columns(exact):
+        assert np.array_equal(np.sort(column), source)
+
+    for scheme in ("stationary", "moving"):
+        directory = tmp_path / scheme
+        manifest = write_datasets(
+            market, str(directory), block_sizes=(5,), n_paths=8, seed=4, scheme=scheme
+        )
+        assert manifest["preserves_multiset"] is False
+        assert "exactly once" not in manifest["note"]
+        assert "with replacement" in manifest["note"]
+        # And the claim it declines to make is one it could not have made.
+        assert any(
+            not np.array_equal(np.sort(column), source)
+            for column in written_columns(directory)
+        ), f"the {scheme} bootstrap preserved the multiset, which it should not"
 
 
 def test_write_datasets_rejects_an_unknown_scheme(tmp_path):

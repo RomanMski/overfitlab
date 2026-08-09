@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -70,10 +71,12 @@ jobs:
           fi
 
       - name: Commit the rebuilt PDF
+        id: commit
         if: github.event_name == 'push'
         run: |
           if git diff --quiet -- paper/main.pdf; then
             echo "the PDF was already up to date"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -81,6 +84,17 @@ jobs:
           git add paper/main.pdf
           git commit -m "Rebuild the paper PDF from main.tex"
           git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # A commit made with GITHUB_TOKEN does not trigger workflows, which is
+      # what stops this from looping. It also means the site would keep serving
+      # the previous PDF until something else pushed, so the deploy is asked
+      # for explicitly.
+      - name: Redeploy the site with the new PDF
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run "Deploy site" --ref "${{ github.ref_name }}"
 
       - name: Upload the PDF
         uses: actions/upload-artifact@v4

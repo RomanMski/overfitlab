@@ -90,7 +90,7 @@ gives 0.002 and zero out of 2000 gives 0.0005, and neither is a measurement of
 how much smaller than that the truth might be. The figure below uses 2000.
 
 So the two cases sit at 0.52 and 0.42 dependence, close enough to be called the
-same, with p-values of 0.29 and 0.002. That is the figure below and it is the
+same, with p-values of 0.29 and 0.0005. That is the figure below and it is the
 argument for reporting both numbers.
 
 ![Structure dependence says one thing and the shuffles say another](images/real-data.png)
