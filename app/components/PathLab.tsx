@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 
 import {
   autocorrelatedMarket,
+  blockPermutation,
   buyAndHold,
   cumulative,
   makeRng,
   momentumStrategy,
   pathStress,
-  stationaryBootstrap,
 } from "../lib/quant";
 
 const WIDTH = 720;
@@ -36,7 +36,7 @@ export function PathLab() {
   const shown = useMemo(() => {
     const rng = makeRng(1000 + block);
     return Array.from({ length: 24 }, () =>
-      cumulative(stationaryBootstrap(market, block, rng)),
+      cumulative(blockPermutation(market, block, rng)),
     );
   }, [market, block]);
 
@@ -71,7 +71,7 @@ export function PathLab() {
 
   const keeps =
     block === 1
-      ? "Order only. Returns are drawn independently, so no autocorrelation survives. The mean, the spread and the fat tails are exactly as they were, which is why this is not a noise series."
+      ? "Order only. Every observation appears exactly once, so the mean, the spread and the fat tails are identical to the real series. Only the arrangement changes, which is why this is not a noise series."
       : `Runs of ${block} periods stay intact and only their order is shuffled.`;
 
   return (

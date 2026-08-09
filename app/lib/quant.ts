@@ -383,7 +383,7 @@ export function pathStress(
     const rng = makeRng(seed * 7919 + position);
     const scores: number[] = [];
     for (let path = 0; path < nPaths; path += 1) {
-      scores.push(sharpe(strategy(stationaryBootstrap(market, block, rng))));
+      scores.push(sharpe(strategy(blockPermutation(market, block, rng))));
     }
     scores.sort((a, b) => a - b);
     const quantile = (q: number) =>
@@ -534,4 +534,29 @@ export function probabilityOfBacktestOverfitting(
     if ((beaten + 1) / (nConfigs + 1) < 0.5) below += 1;
   }
   return { pbo: below / groups.length, nCombinations: groups.length };
+}
+
+/**
+ * Cut the series into consecutive blocks and permute their order.
+ *
+ * Samples without replacement, so every observation appears exactly once and
+ * the mean, variance, skew and extremes are identical to the source. Only the
+ * arrangement changes. The bootstrap above draws with replacement and does not
+ * have that property, which is why this is what the generator uses.
+ */
+export function blockPermutation(
+  returns: number[],
+  blockSize: number,
+  rng: () => number,
+): number[] {
+  const blocks: number[][] = [];
+  for (let start = 0; start < returns.length; start += blockSize) {
+    blocks.push(returns.slice(start, start + blockSize));
+  }
+  // Fisher-Yates over the block order.
+  for (let i = blocks.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+  }
+  return blocks.flat();
 }

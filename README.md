@@ -17,9 +17,11 @@ from overfitlab import write_datasets
 write_datasets(returns, "generated/", block_sizes=(1, 5, 20, 60), n_paths=100)
 ```
 
-At block 1 the returns are drawn independently, so no ordering survives while the mean, the variance, the skew and every fat tail stay exactly as they were. At block 60 runs of sixty periods stay intact and only their arrangement changes. Sweeping the range tells you more than picking one value.
+At block 1 the observations are permuted, so no ordering survives. At block 60 runs of sixty periods stay intact and only their arrangement changes. Sweeping the range tells you more than picking one value.
 
-Every value in every generated series appeared in your original. Resampling reorders, so these are alternative arrangements rather than new observations, and they carry no information your data did not already contain. Nothing that only reads your history can do better than that.
+The generator permutes rather than resamples, so every observation in your series appears exactly once in every generated version. The mean, the variance, the skew and the extremes are identical to your data and only the order changes. That matters, because a bootstrap draws with replacement and its paths drop some observations and duplicate others, which moves the moments and lets a model fail for reasons that have nothing to do with sequence. The bootstrap functions are still available for anyone who wants bootstrap inference.
+
+These are arrangements of your history rather than new observations, so they carry no information your data did not already contain. Nothing that only reads your history can.
 
 ## If you also want the checks scored for you
 
@@ -29,11 +31,11 @@ Run them on 60 configurations built from pure noise, with a true Sharpe of exact
 
 The second check splits your history in half every possible way, finds the best configuration in one half, and looks at where it ranks in the other. If the winner usually lands below the median of its peers then whatever is selecting it is not finding anything, and above 0.5 means you would have done better choosing at random.
 
-The third one is different in kind. Both of the others ask whether your result beats what searching produces by chance. Neither asks whether the market held anything to find. So this takes your price history, resamples it hundreds of times at a range of block lengths, and reruns your strategy on every version. At block 1 the returns are drawn independently and no ordering survives. At block 60 runs of sixty periods stay intact and only their arrangement changes.
+The third one is different in kind. Both of the others ask whether your result beats what searching produces by chance. Neither asks whether the market held anything to find. So this takes your price history, resamples it hundreds of times at a range of block lengths, and reruns your strategy on every version. At block 1 the observations are permuted and no ordering survives. At block 60 runs of sixty periods stay intact.
 
 Reading the gradient is the point. In the figure above a trend follower earns 1.00 on the market that happened, collapses to 0.04 once the ordering is destroyed, and climbs back to 1.00 as the runs return. Buy and hold earns 0.36 and earns 0.38 shuffled, flat at every block length, because reordering a series cannot change its mean.
 
-It is easy to call the shuffled version noise and it is not. Shuffling keeps the mean, the variance, the skew and every fat tail exactly as they were, and only changes the order. That is why buy and hold does not notice. A strategy that dies under shuffling has shown its result needs the ordering, which fits a timing edge but also fits volatility targeting, sizing that reacts to recent variance, or a lookback bug. It narrows the question rather than settling it.
+It is easy to call the shuffled version noise and it is not. Permuting keeps the mean, the variance, the skew and every fat tail exactly as they were, and only changes the order. That is why buy and hold does not notice. A strategy that dies under shuffling has shown its result needs the ordering, which fits a timing edge but also fits volatility targeting, sizing that reacts to recent variance, or a lookback bug. It narrows the question rather than settling it.
 
 ```python
 from overfitlab import (
@@ -62,7 +64,7 @@ Both selection statistics assume your trials are roughly interchangeable draws. 
 
 The overfitting probability ignores time order entirely. It draws combinations of blocks without caring which came first, so a strategy that worked until the regime changed and then stopped looks fine to it. That is how the published method works, and it is why it is not reported on its own here.
 
-Resampling keeps volatility clustering inside a block and loses it across the joins, so the synthetic paths are calmer in the tails than the series they came from. Nothing anywhere models transaction costs, and a strategy trading daily can lose most of a 1.00 Sharpe to spread and slippage without any of these numbers noticing.
+Permuting keeps volatility clustering inside a block and loses it across the joins, so the generated paths cluster less than the series they came from even though their marginal distribution is identical. Nothing anywhere models transaction costs, and a strategy trading daily can lose most of a 1.00 Sharpe to spread and slippage without any of these numbers noticing.
 
 Passing all three is not evidence of an edge. It means selection alone does not explain your result, which is a much smaller claim and the only one the arithmetic supports.
 

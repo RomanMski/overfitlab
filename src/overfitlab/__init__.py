@@ -11,6 +11,7 @@ from .deflated import (
 from .pbo import PBOResult, probability_of_backtest_overfitting
 from .synthetic import (
     PathStressResult,
+    block_permutation,
     generate_datasets,
     iid_bootstrap,
     moving_block_bootstrap,
@@ -23,6 +24,7 @@ __all__ = [
     "DeflatedSharpeResult",
     "PBOResult",
     "PathStressResult",
+    "block_permutation",
     "deflated_sharpe_ratio",
     "expected_maximum_sharpe",
     "probabilistic_sharpe_ratio",

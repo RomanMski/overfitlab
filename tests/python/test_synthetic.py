@@ -243,3 +243,66 @@ def test_a_strategy_that_returns_nothing_usable_fails_loudly():
     market = ar1_market(400)
     with pytest.raises(ValueError, match="non-finite"):
         path_stress(lambda values: np.full(values.size, np.nan), market, n_paths=4)
+
+
+def test_permutation_preserves_every_observation_exactly():
+    """The documented claim is that only the ordering changes.
+
+    That is true of a permutation and false of a bootstrap. Sampling with
+    replacement drops some observations and duplicates others, so its paths
+    have different moments from the source, and a strategy could fail on them
+    for reasons unrelated to sequence.
+    """
+
+    from overfitlab import block_permutation
+
+    rng = np.random.default_rng(0)
+    market = rng.standard_t(df=3, size=900) * 0.01
+
+    for block in (1, 5, 60):
+        paths = block_permutation(market, 30, block_size=block, seed=2)
+        for path in paths:
+            assert np.array_equal(np.sort(path), np.sort(market))
+        assert np.allclose(paths.mean(axis=1), market.mean())
+        assert np.allclose(paths.std(axis=1, ddof=1), market.std(ddof=1))
+
+
+def test_the_bootstrap_does_not_preserve_them_which_is_why_it_is_not_default():
+    rng = np.random.default_rng(0)
+    market = rng.standard_t(df=3, size=900) * 0.01
+    paths = iid_bootstrap(market, 50, seed=2)
+
+    # Some observations are dropped and others repeated.
+    assert any(len(set(path)) < len(set(market)) for path in paths)
+    # So the path means scatter around the source mean rather than matching it.
+    assert paths.mean(axis=1).std() > 0
+
+
+def test_default_scheme_is_the_permutation():
+    from overfitlab import generate_datasets
+
+    rng = np.random.default_rng(1)
+    market = rng.normal(scale=0.01, size=600)
+    datasets = generate_datasets(market, block_sizes=(1, 20), n_paths=10, seed=3)
+
+    for paths in datasets.values():
+        for path in paths:
+            assert np.array_equal(np.sort(path), np.sort(market))
+
+
+def test_permutation_still_destroys_ordering_at_block_one():
+    from overfitlab import block_permutation
+
+    market = ar1_market(3000, phi=0.4, seed=5)
+    assert autocorrelation(market) > 0.25
+
+    paths = block_permutation(market, 40, block_size=1, seed=7)
+    resampled = np.array([autocorrelation(path) for path in paths])
+    assert abs(resampled.mean()) < 0.05
+
+
+def test_unknown_scheme_is_rejected():
+    from overfitlab import generate_datasets
+
+    with pytest.raises(ValueError, match="scheme must be"):
+        generate_datasets(ar1_market(200), scheme="wishful")

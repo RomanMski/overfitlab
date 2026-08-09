@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  autocorrelatedMarket,
+  blockPermutation,
   expectedMaximumSharpe,
   generateNoiseTrials,
   makeRng,
+  normalDraws,
   normInv,
   polynomialFit,
   rootMeanSquaredError,
@@ -132,4 +135,37 @@ test("searching more no-signal trials manufactures a better looking winner", () 
 test("the snapshot is stable when the slider returns to a position", () => {
   const trials = generateNoiseTrials(13, 300, 600);
   assert.deepEqual(searchSnapshot(trials, 120, 252), searchSnapshot(trials, 120, 252));
+});
+
+test("blockPermutation keeps every observation exactly once", () => {
+  const rng = makeRng(3);
+  const market = normalDraws(makeRng(9), 600).map((v) => v * 0.01);
+  const sorted = [...market].sort((a, b) => a - b);
+
+  for (const block of [1, 5, 60]) {
+    const path = blockPermutation(market, block, rng);
+    assert.equal(path.length, market.length);
+    assert.deepEqual([...path].sort((a, b) => a - b), sorted);
+  }
+});
+
+test("blockPermutation at block one destroys ordering", () => {
+  const autocorrelation = (v: number[]) => {
+    const m = v.reduce((a, b) => a + b, 0) / v.length;
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < v.length; i += 1) {
+      den += (v[i] - m) ** 2;
+      if (i > 0) num += (v[i] - m) * (v[i - 1] - m);
+    }
+    return num / den;
+  };
+
+  const market = autocorrelatedMarket(11, 3000, 0.4, 0);
+  assert.ok(autocorrelation(market) > 0.25);
+
+  const rng = makeRng(5);
+  const shuffled = Array.from({ length: 20 }, () => blockPermutation(market, 1, rng));
+  const mean = shuffled.map(autocorrelation).reduce((a, b) => a + b, 0) / shuffled.length;
+  assert.ok(Math.abs(mean) < 0.05, `autocorrelation survived at ${mean}`);
 });

@@ -198,7 +198,7 @@ def deflated_sharpe_ratio(
     returns:
         A ``(n_observations, n_trials)`` table of period-by-period returns, one
         column per configuration you tried, or a single series. As with
-        :func:`~backtest_audit.pbo.probability_of_backtest_overfitting`, pass
+        :func:`~overfitlab.pbo.probability_of_backtest_overfitting`, pass
         every trial you ran. The count of trials is what sets the benchmark, so
         under-reporting it inflates the result.
     selected:

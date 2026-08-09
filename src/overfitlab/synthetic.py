@@ -8,11 +8,17 @@ This module builds new paths from the one you have and reruns the strategy on
 each. The interesting control is *how much structure the resampling keeps*:
 
 ``block_size = 1``
-    Serial dependence is destroyed. Returns are drawn independently, so no
-    autocorrelation, no momentum, no mean reversion and no volatility
-    clustering survives. The *marginal* distribution is untouched, so the mean,
-    the variance, the skew and every fat tail are exactly as observed. This is
-    not a noise series. It is the same returns in a different order.
+    A plain permutation. Every observation appears exactly once, so the mean,
+    the variance, the skew and every extreme value are identical to the source
+    and only the arrangement changes. No autocorrelation, no momentum, no mean
+    reversion and no volatility clustering survives. This is not a noise
+    series. It is the same returns in a different order.
+
+    The default scheme permutes rather than resamples for exactly this reason.
+    A bootstrap draws with replacement, so its paths drop some observations and
+    duplicate others, and their moments differ from the source. A strategy
+    could then fail on them for reasons unrelated to sequence. The bootstrap
+    functions remain available for anyone who wants bootstrap inference.
 
 ``block_size = 20``
     Runs of twenty periods are kept intact and only their order is shuffled.
@@ -136,6 +142,49 @@ def stationary_bootstrap(
     return data[indices]
 
 
+def block_permutation(
+    returns: Sequence[float] | np.ndarray,
+    n_paths: int,
+    *,
+    block_size: int,
+    seed: int = 0,
+) -> np.ndarray:
+    """Cut the series into consecutive blocks and permute their order.
+
+    Unlike the bootstrap schemes this samples without replacement, so every
+    observation appears exactly once in every generated path. The multiset of
+    returns is identical to the source, which means the mean, the variance, the
+    skewness and every extreme value are preserved exactly rather than in
+    expectation. Only the arrangement changes.
+
+    That is what makes it the right tool for asking whether a result depends on
+    ordering. A bootstrap answers a different question and its paths have
+    different moments from the source, so a strategy could fail on them for
+    reasons that have nothing to do with sequence.
+
+    ``block_size = 1`` is a plain permutation of the observations. A trailing
+    partial block is kept whole and permuted with the rest, so nothing is
+    dropped and nothing is duplicated.
+    """
+
+    data = _as_returns(returns, name="returns")
+    if block_size < 1:
+        raise ValueError("block_size must be at least 1")
+    if block_size > data.size:
+        raise ValueError("block_size cannot exceed the number of observations")
+    if n_paths < 1:
+        raise ValueError("n_paths must be at least 1")
+
+    generator = _rng(seed)
+    edges = list(range(0, data.size, block_size))
+    blocks = [data[start : start + block_size] for start in edges]
+
+    out = np.empty((n_paths, data.size), dtype=float)
+    for path in range(n_paths):
+        order = generator.permutation(len(blocks))
+        out[path] = np.concatenate([blocks[index] for index in order])
+    return out
+
 def _sharpe(values: np.ndarray) -> float:
     if values.size < 2:
         return 0.0
@@ -234,7 +283,7 @@ def path_stress(
     n_paths: int = 200,
     periods_per_year: int = 252,
     seed: int = 0,
-    stationary: bool = True,
+    scheme: str = "permutation",
 ) -> PathStressResult:
     """Rerun ``strategy`` on synthetic markets built from ``market_returns``.
 
@@ -270,16 +319,13 @@ def path_stress(
 
     for position, block in enumerate(blocks):
         level_seed = seed * 1_000_003 + position
-        if block == 1:
-            paths = iid_bootstrap(data, n_paths, seed=level_seed)
-        elif stationary:
-            paths = stationary_bootstrap(
-                data, n_paths, expected_block=float(block), seed=level_seed
-            )
-        else:
-            paths = moving_block_bootstrap(
-                data, n_paths, block_size=block, seed=level_seed
-            )
+        paths = generate_datasets(
+            data,
+            block_sizes=(block,),
+            n_paths=n_paths,
+            seed=seed * 7919 + position,
+            scheme=scheme,
+        )[block]
 
         scores: list[float] = []
         for index in range(paths.shape[0]):
@@ -334,7 +380,7 @@ def generate_datasets(
     block_sizes: Sequence[int] = (1, 5, 20, 60),
     n_paths: int = 100,
     seed: int = 0,
-    stationary: bool = True,
+    scheme: str = "permutation",
 ) -> dict[int, np.ndarray]:
     """Build alternative versions of a return series and hand them back.
 
@@ -363,15 +409,29 @@ def generate_datasets(
     out: dict[int, np.ndarray] = {}
     for position, block in enumerate(blocks):
         level_seed = seed * 1_000_003 + position
-        if block == 1:
-            out[block] = iid_bootstrap(data, n_paths, seed=level_seed)
-        elif stationary:
-            out[block] = stationary_bootstrap(
-                data, n_paths, expected_block=float(block), seed=level_seed
+        if scheme == "permutation":
+            out[block] = block_permutation(
+                data, n_paths, block_size=block, seed=level_seed
+            )
+        elif scheme == "stationary":
+            out[block] = (
+                iid_bootstrap(data, n_paths, seed=level_seed)
+                if block == 1
+                else stationary_bootstrap(
+                    data, n_paths, expected_block=float(block), seed=level_seed
+                )
+            )
+        elif scheme == "moving":
+            out[block] = (
+                iid_bootstrap(data, n_paths, seed=level_seed)
+                if block == 1
+                else moving_block_bootstrap(
+                    data, n_paths, block_size=block, seed=level_seed
+                )
             )
         else:
-            out[block] = moving_block_bootstrap(
-                data, n_paths, block_size=block, seed=level_seed
+            raise ValueError(
+                f"scheme must be permutation, stationary or moving; got {scheme!r}"
             )
     return out
 

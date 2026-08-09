@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 
-import { autocorrelatedMarket, makeRng, stationaryBootstrap } from "../lib/quant";
+import { autocorrelatedMarket, blockPermutation, makeRng } from "../lib/quant";
 
 const BLOCKS = [1, 5, 20, 60];
 
@@ -84,7 +84,7 @@ export function GeneratorLab() {
   const generate = (block: number) => {
     const rng = makeRng(20260801 + block);
     return Array.from({ length: nPaths }, () =>
-      stationaryBootstrap(active.values, block, rng),
+      blockPermutation(active.values, block, rng),
     );
   };
 
@@ -107,11 +107,11 @@ export function GeneratorLab() {
       source_periods: active.values.length,
       paths_per_block: nPaths,
       block_sizes: BLOCKS,
-      scheme: "stationary bootstrap, Politis and Romano 1994",
+      scheme: "block permutation, sampled without replacement",
       note:
-        "Every value in these files appeared in the source series. They are " +
-        "reorderings, not new observations, and carry no information the " +
-        "source did not already contain.",
+        "Every observation in the source appears exactly once in every " +
+        "generated series. The mean, the variance, the skew and the extremes " +
+        "are identical to the source and only the order changes.",
     };
     download("manifest.json", JSON.stringify(manifest, null, 2));
   };
@@ -192,7 +192,7 @@ export function GeneratorLab() {
         <tbody>
           <tr>
             <td>block-001.csv</td>
-            <td>order destroyed, distribution intact</td>
+            <td>order destroyed, every value kept</td>
             <td>does the model need the ordering at all</td>
           </tr>
           <tr>
@@ -220,9 +220,11 @@ export function GeneratorLab() {
       </div>
 
       <p className="gl-note">
-        Every value in the generated files appeared in your source series. These
-        are reorderings rather than new observations, so they cannot tell your
-        model about behaviour your data never contained. What they can do is
+        Every observation in your source appears exactly once in every generated
+        series, so the mean, the variance, the skew and the extremes are
+        identical and only the order changes. These are reorderings rather than
+        new observations, so they cannot tell your model about behaviour your
+        data never contained. What they can do is
         show you how much of its result depended on the particular order your
         history happened to arrive in.
       </p>
