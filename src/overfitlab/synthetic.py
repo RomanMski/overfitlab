@@ -491,7 +491,7 @@ def write_datasets(
     block_sizes: Sequence[int] = (1, 5, 20, 60),
     n_paths: int = 100,
     seed: int = 0,
-    stationary: bool = True,
+    scheme: str = "permutation",
 ) -> dict[str, object]:
     """Write the generated series to CSV files and return a manifest.
 
@@ -511,7 +511,7 @@ def write_datasets(
         block_sizes=block_sizes,
         n_paths=n_paths,
         seed=seed,
-        stationary=stationary,
+        scheme=scheme,
     )
     os.makedirs(directory, exist_ok=True)
 
@@ -530,7 +530,7 @@ def write_datasets(
         "source_periods": int(data.size),
         "source_fingerprint": digest,
         "seed": int(seed),
-        "scheme": "stationary" if stationary else "moving block",
+        "scheme": scheme,
         "files": files,
         "note": (
             "Every value in these files appeared in the source series. They are "

@@ -376,3 +376,69 @@ def test_apply_block_order_rejects_a_bad_ordering():
 
     with pytest.raises(ValueError, match="permutation of"):
         apply_block_order([1, 2, 3, 4, 5, 6], 2, [0, 0, 1])
+
+
+def test_write_datasets_round_trips_to_disk(tmp_path):
+    """This was broken by a rename and no test noticed, so now one does."""
+
+    import csv
+    import json
+
+    from overfitlab import write_datasets
+
+    rng = np.random.default_rng(0)
+    market = rng.normal(scale=0.01, size=300)
+    manifest = write_datasets(
+        market, str(tmp_path), block_sizes=(1, 20), n_paths=6, seed=2
+    )
+
+    assert manifest["source_periods"] == 300
+    assert manifest["scheme"] == "permutation"
+    assert [entry["file"] for entry in manifest["files"]] == [
+        "block-001.csv",
+        "block-020.csv",
+    ]
+
+    written = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert written == manifest
+
+    with (tmp_path / "block-001.csv").open(encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))
+    header, body = rows[0], rows[1:]
+    assert header == [f"path_{index + 1}" for index in range(6)]
+    assert len(body) == 300
+
+    # Every written column has to be a rearrangement of the source.
+    columns = np.array([[float(cell) for cell in row] for row in body]).T
+    for column in columns:
+        assert np.allclose(np.sort(column), np.sort(market))
+
+
+def test_write_datasets_rejects_an_unknown_scheme(tmp_path):
+    from overfitlab import write_datasets
+
+    with pytest.raises(ValueError, match="scheme must be"):
+        write_datasets(np.zeros(50) + 0.01, str(tmp_path), scheme="wishful")
+
+
+def test_a_multiset_only_strategy_is_exactly_invariant():
+    """The sharpest available check that the generator only reorders.
+
+    Buy and hold depends solely on the multiset of returns, so a permutation
+    cannot change its result. Under a bootstrap it moved, which is what
+    revealed the original error. Any deviation beyond floating point here means
+    the generator is doing something other than reordering.
+    """
+
+    rng = np.random.default_rng(1)
+    market = rng.normal(loc=0.0004, scale=0.011, size=1500)
+
+    result = path_stress(
+        always_long, market, block_sizes=(1, 5, 20, 60), n_paths=100, seed=4
+    )
+
+    for level in result.levels:
+        assert level["median_annualised"] == pytest.approx(
+            result.observed_annualised, abs=1e-12
+        )
+    assert result.structure_dependence() == pytest.approx(0.0, abs=1e-12)

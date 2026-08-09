@@ -33,7 +33,7 @@ The second check splits your history in half every possible way, finds the best 
 
 The third one is different in kind. Both of the others ask whether your result beats what searching produces by chance. Neither asks whether the market held anything to find. So this takes your price history, resamples it hundreds of times at a range of block lengths, and reruns your strategy on every version. At block 1 the observations are permuted and no ordering survives. At block 60 runs of sixty periods stay intact.
 
-Reading the gradient is the point. In the figure above a trend follower earns 1.00 on the market that happened, collapses to 0.04 once the ordering is destroyed, and climbs back to 1.00 as the runs return. Buy and hold earns 0.36 and earns 0.38 shuffled, flat at every block length, because reordering a series cannot change its mean.
+Reading the gradient is the point. In the figure above a trend follower earns 1.00 on the market that happened, collapses to 0.00 once the ordering is destroyed, and climbs back as the runs return. Buy and hold earns 0.36 at every block length, identical to within one floating point unit, because its result is a function of the multiset of returns and permuting cannot change that.
 
 It is easy to call the shuffled version noise and it is not. Permuting keeps the mean, the variance, the skew and every fat tail exactly as they were, and only changes the order. That is why buy and hold does not notice. A strategy that dies under shuffling has shown its result needs the ordering, which fits a timing edge but also fits volatility targeting, sizing that reacts to recent variance, or a lookback bug. It narrows the question rather than settling it.
 
