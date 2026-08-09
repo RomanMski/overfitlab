@@ -306,3 +306,73 @@ def test_unknown_scheme_is_rejected():
 
     with pytest.raises(ValueError, match="scheme must be"):
         generate_datasets(ar1_market(200), scheme="wishful")
+
+
+def _fixture():
+    import json
+    import pathlib
+
+    path = pathlib.Path(__file__).parents[1] / "fixtures" / "block-order.json"
+    return json.loads(path.read_text(encoding="utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", _fixture(), ids=lambda case: case["name"])
+def test_block_cutting_matches_the_shared_fixture(case):
+    """One specification, checked by both languages.
+
+    A cross language test catches the two implementations drifting apart. It
+    does not catch them agreeing on the same wrong thing, which is how the
+    bootstrap error survived in both. The fixture is written by hand for that
+    reason rather than generated from either implementation.
+    """
+
+    from overfitlab import apply_block_order
+
+    result = apply_block_order(case["source"], case["block_size"], case["order"])
+    assert list(result) == pytest.approx(case["expected"])
+
+
+@pytest.mark.parametrize(
+    "n, block",
+    [(100, 7), (100, 3), (101, 10), (13, 5), (9, 4), (8, 1), (50, 49), (12, 5)],
+)
+def test_multiset_survives_awkward_block_sizes(n, block):
+    """The ragged final block is where this would break."""
+
+    from overfitlab import block_permutation
+
+    rng = np.random.default_rng(n * 31 + block)
+    market = rng.normal(size=n)
+    paths = block_permutation(market, 20, block_size=block, seed=3)
+
+    assert paths.shape == (20, n)
+    for path in paths:
+        assert np.array_equal(np.sort(path), np.sort(market))
+
+
+def test_repeated_values_keep_their_multiplicity():
+    from overfitlab import block_permutation
+
+    market = np.array([0.01, 0.01, -0.02, 0.01, -0.02, 0.03, 0.01, 0.0])
+    paths = block_permutation(market, 20, block_size=3, seed=1)
+
+    source_counts = np.unique(market, return_counts=True)
+    for path in paths:
+        assert np.array_equal(np.unique(path, return_counts=True)[1], source_counts[1])
+
+
+def test_a_single_block_is_rejected_rather_than_silently_doing_nothing():
+    from overfitlab import block_permutation
+
+    market = np.arange(20, dtype=float)
+    with pytest.raises(ValueError, match="single block"):
+        block_permutation(market, 5, block_size=20)
+    with pytest.raises(ValueError, match="single block"):
+        block_permutation(market, 5, block_size=40)
+
+
+def test_apply_block_order_rejects_a_bad_ordering():
+    from overfitlab import apply_block_order
+
+    with pytest.raises(ValueError, match="permutation of"):
+        apply_block_order([1, 2, 3, 4, 5, 6], 2, [0, 0, 1])

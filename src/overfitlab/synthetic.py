@@ -142,6 +142,37 @@ def stationary_bootstrap(
     return data[indices]
 
 
+def apply_block_order(
+    returns: Sequence[float] | np.ndarray,
+    block_size: int,
+    order: Sequence[int],
+) -> np.ndarray:
+    """Cut into consecutive blocks and concatenate them in ``order``.
+
+    Separated from the random draw so the block arithmetic can be checked
+    against a fixed expected output, including the ragged final block, without
+    a generator in the way. The browser implements the same function and both
+    are tested against one shared fixture.
+    """
+
+    # Deliberately not _as_returns. This is a mechanical rearrangement rather
+    # than a statistical procedure, so the minimum length that a return series
+    # needs does not apply and the fixture cases are short on purpose.
+    data = np.asarray(returns, dtype=float).reshape(-1)
+    if data.size == 0:
+        raise ValueError("returns is empty")
+    if not np.all(np.isfinite(data)):
+        raise ValueError("returns contains non-finite values")
+    if block_size < 1:
+        raise ValueError("block_size must be at least 1")
+    starts = list(range(0, data.size, block_size))
+    if sorted(order) != list(range(len(starts))):
+        raise ValueError(
+            f"order must be a permutation of 0..{len(starts) - 1}, got {list(order)}"
+        )
+    return np.concatenate([data[s : s + block_size] for s in (starts[i] for i in order)])
+
+
 def block_permutation(
     returns: Sequence[float] | np.ndarray,
     n_paths: int,
@@ -165,13 +196,29 @@ def block_permutation(
     ``block_size = 1`` is a plain permutation of the observations. A trailing
     partial block is kept whole and permuted with the rest, so nothing is
     dropped and nothing is duplicated.
+
+    The number of blocks is ``ceil(n / block_size)``, and it controls how much
+    stress the result carries. Few blocks means few possible arrangements and
+    most local dependence surviving, so a large block size is close to a copy
+    of the source and should be read as the low stress end of a sweep rather
+    than as a test in its own right.
+
+    Preserving the multiplicity of every observation is an exact statement
+    about the data. Empirical statistics that do not depend on order are
+    therefore mathematically unchanged, though a recomputed mean or standard
+    deviation can differ in the last bits because floating point addition is
+    not associative and the summation order changes.
     """
 
     data = _as_returns(returns, name="returns")
     if block_size < 1:
         raise ValueError("block_size must be at least 1")
-    if block_size > data.size:
-        raise ValueError("block_size cannot exceed the number of observations")
+    if block_size >= data.size:
+        raise ValueError(
+            f"block_size {block_size} leaves a single block of {data.size} "
+            "observations, so every generated path would be a copy of the "
+            "source. Use a block size smaller than the series."
+        )
     if n_paths < 1:
         raise ValueError("n_paths must be at least 1")
 
@@ -181,8 +228,9 @@ def block_permutation(
 
     out = np.empty((n_paths, data.size), dtype=float)
     for path in range(n_paths):
-        order = generator.permutation(len(blocks))
-        out[path] = np.concatenate([blocks[index] for index in order])
+        out[path] = np.concatenate(
+            [blocks[index] for index in generator.permutation(len(blocks))]
+        )
     return out
 
 def _sharpe(values: np.ndarray) -> float:

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   autocorrelatedMarket,
+  applyBlockOrder,
   blockPermutation,
   expectedMaximumSharpe,
   generateNoiseTrials,
@@ -168,4 +169,33 @@ test("blockPermutation at block one destroys ordering", () => {
   const shuffled = Array.from({ length: 20 }, () => blockPermutation(market, 1, rng));
   const mean = shuffled.map(autocorrelation).reduce((a, b) => a + b, 0) / shuffled.length;
   assert.ok(Math.abs(mean) < 0.05, `autocorrelation survived at ${mean}`);
+});
+
+test("block cutting matches the shared fixture", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const url = new URL("./fixtures/block-order.json", import.meta.url);
+  const { cases } = JSON.parse(await readFile(url, "utf8"));
+
+  assert.ok(cases.length > 0, "fixture is empty");
+  for (const testCase of cases) {
+    const got = applyBlockOrder(testCase.source, testCase.block_size, testCase.order);
+    assert.deepEqual(got, testCase.expected, testCase.name);
+  }
+});
+
+test("applyBlockOrder rejects an ordering that is not a permutation", () => {
+  assert.throws(() => applyBlockOrder([1, 2, 3, 4, 5, 6], 2, [0, 0, 1]), /permutation/);
+});
+
+test("blockPermutation keeps the multiset at awkward block sizes", () => {
+  for (const [n, block] of [[100, 7], [101, 10], [13, 5], [9, 4], [12, 5]]) {
+    const market = normalDraws(makeRng(n * 31 + block), n);
+    const sorted = [...market].sort((a, b) => a - b);
+    const rng = makeRng(3);
+    for (let path = 0; path < 10; path += 1) {
+      const got = blockPermutation(market, block, rng);
+      assert.equal(got.length, n);
+      assert.deepEqual([...got].sort((a, b) => a - b), sorted, `n=${n} block=${block}`);
+    }
+  }
 });

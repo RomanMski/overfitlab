@@ -549,14 +549,39 @@ export function blockPermutation(
   blockSize: number,
   rng: () => number,
 ): number[] {
+  const blockCount = Math.ceil(returns.length / blockSize);
+  const order = Array.from({ length: blockCount }, (_, index) => index);
+  // Fisher-Yates over the block order.
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return applyBlockOrder(returns, blockSize, order);
+}
+
+/**
+ * Cut into consecutive blocks and concatenate them in the given order.
+ *
+ * Split out from the random draw so the block arithmetic can be checked
+ * against a fixed expected output, including the ragged final block. The
+ * Python package has the same function and both are tested against one shared
+ * fixture, because a cross language test catches the two drifting apart but
+ * not both agreeing on the same wrong thing.
+ */
+export function applyBlockOrder(
+  returns: number[],
+  blockSize: number,
+  order: number[],
+): number[] {
+  if (blockSize < 1) throw new Error("blockSize must be at least 1");
   const blocks: number[][] = [];
   for (let start = 0; start < returns.length; start += blockSize) {
     blocks.push(returns.slice(start, start + blockSize));
   }
-  // Fisher-Yates over the block order.
-  for (let i = blocks.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+  const sorted = [...order].sort((a, b) => a - b);
+  const expected = blocks.map((_, index) => index);
+  if (sorted.length !== expected.length || sorted.some((v, i) => v !== expected[i])) {
+    throw new Error(`order must be a permutation of 0..${blocks.length - 1}`);
   }
-  return blocks.flat();
+  return order.flatMap((index) => blocks[index]);
 }
