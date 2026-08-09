@@ -10,7 +10,9 @@ from .deflated import (
 )
 from .pbo import PBOResult, probability_of_backtest_overfitting
 from .synthetic import (
+    INDICATIVE_COST_BPS,
     PathStressResult,
+    apply_costs,
     apply_block_order,
     block_permutation,
     generate_datasets,
@@ -24,7 +26,9 @@ from .synthetic import (
 __all__ = [
     "DeflatedSharpeResult",
     "PBOResult",
+    "INDICATIVE_COST_BPS",
     "PathStressResult",
+    "apply_costs",
     "apply_block_order",
     "block_permutation",
     "deflated_sharpe_ratio",

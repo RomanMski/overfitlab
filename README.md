@@ -54,6 +54,26 @@ path_stress(strategy, market_returns, block_sizes=(1, 5, 20, 60))
 
 Pass every configuration you tried, including the ones that did badly. Dropping those is the exact bias these numbers exist to catch.
 
+## Transaction costs
+
+`path_stress` can charge costs, which needs turnover, which needs positions. Return a `(returns, positions)` pair from your strategy and set `cost_bps`, and every change in exposure is charged that many basis points of the amount traded.
+
+```python
+def trend(market):
+    positions = np.sign(market[:-1])
+    return positions * market[1:], positions
+
+path_stress(trend, market_returns, cost_bps=10.0)
+```
+
+On a simulated market with real momentum, that trend follower earns 4.23 annualised gross, 4.00 at 2 basis points and 3.08 at 10. Buy and hold earns 0.46 at every level, because it opens once and never trades again.
+
+`INDICATIVE_COST_BPS` holds starting values by asset class, from large cap equity at 2 through crypto majors at 10 to corporate bonds at 50. They are a place to start, not a quote for your account. Spread, commission and impact all depend on your venue, your size and how you route, so use your own fills if you have them, and if you do not, run the sweep at two or three values and see whether the answer changes.
+
+Setting `cost_bps` on a strategy that returns only its returns raises rather than reporting a gross figure as though it were net.
+
+Costs also change how the sweep reads. Structure dependence can exceed one, which means the shuffled markets turn the strategy negative, because there it pays to trade on structure that is no longer present.
+
 ## Installing
 
 Install with `python -m pip install -e .` and you need Python 3.10 or newer with NumPy, pandas and SciPy. Everything the package does also runs in the browser demo with nothing installed, and to serve that locally it is `npm ci && npm run dev`.

@@ -233,6 +233,53 @@ def block_permutation(
         )
     return out
 
+# Indicative round trip costs in basis points of notional traded, for setting a
+# starting value. These are ranges seen in public venue schedules and execution
+# studies, not a quote for your account. Spread, commission, fees and market
+# impact all vary by venue, size, time of day and how you route. Use your own
+# fills if you have them. If you do not, run the sweep at two or three values
+# and see whether the answer changes rather than trusting any single number.
+INDICATIVE_COST_BPS = {
+    "equity_large_cap": 2.0,
+    "equity_small_cap": 20.0,
+    "futures_liquid": 1.0,
+    "crypto_major": 10.0,
+    "crypto_alt": 40.0,
+    "government_bond": 5.0,
+    "corporate_bond": 50.0,
+}
+
+
+def apply_costs(
+    returns: Sequence[float] | np.ndarray,
+    positions: Sequence[float] | np.ndarray,
+    cost_bps: float,
+) -> np.ndarray:
+    """Charge ``cost_bps`` of notional on every change in position.
+
+    ``positions`` is the exposure held during each period, so the traded amount
+    in period ``t`` is ``abs(positions[t] - positions[t - 1])``. The first
+    period is charged for opening the initial position from flat.
+
+    This is a linear cost model. It is proportional to size and it ignores
+    market impact, so it understates the cost of a large order and of anything
+    trading illiquid instruments. It is a floor rather than an estimate.
+    """
+
+    net = np.asarray(returns, dtype=float).reshape(-1)
+    held = np.asarray(positions, dtype=float).reshape(-1)
+    if held.size != net.size:
+        raise ValueError(
+            f"positions has {held.size} entries and returns has {net.size}; "
+            "they must describe the same periods"
+        )
+    if not np.isfinite(cost_bps) or cost_bps < 0:
+        raise ValueError("cost_bps must be finite and non-negative")
+
+    traded = np.abs(np.diff(held, prepend=0.0))
+    return net - traded * (cost_bps / 10_000.0)
+
+
 def _sharpe(values: np.ndarray) -> float:
     if values.size < 2:
         return 0.0
@@ -323,6 +370,35 @@ class PathStressResult:
         return "\n".join(lines)
 
 
+def _strategy_returns(
+    strategy: Strategy, series: np.ndarray, cost_bps: float
+) -> np.ndarray:
+    """Run the strategy and charge costs if it reported its positions.
+
+    A strategy may return just its returns, or a ``(returns, positions)`` pair.
+    Costs need turnover, and turnover needs positions, so a strategy that only
+    reports returns cannot be charged. Asking for a cost without positions
+    raises rather than silently reporting a gross number as though it were net.
+    """
+
+    produced = strategy(series)
+    if isinstance(produced, tuple):
+        raw, positions = produced
+        net = np.asarray(raw, dtype=float).reshape(-1)
+        if cost_bps > 0:
+            net = apply_costs(net, positions, cost_bps)
+        return net
+
+    net = np.asarray(produced, dtype=float).reshape(-1)
+    if cost_bps > 0:
+        raise ValueError(
+            "cost_bps was set but the strategy returned only its returns. "
+            "Costs are charged on changes in position, so return a "
+            "(returns, positions) pair to use them."
+        )
+    return net
+
+
 def path_stress(
     strategy: Strategy,
     market_returns: Sequence[float] | np.ndarray,
@@ -332,6 +408,7 @@ def path_stress(
     periods_per_year: int = 252,
     seed: int = 0,
     scheme: str = "permutation",
+    cost_bps: float = 0.0,
 ) -> PathStressResult:
     """Rerun ``strategy`` on synthetic markets built from ``market_returns``.
 
@@ -354,7 +431,7 @@ def path_stress(
     if not blocks or blocks[0] < 1:
         raise ValueError("block_sizes must all be at least 1")
 
-    observed_returns = np.asarray(strategy(data), dtype=float).reshape(-1)
+    observed_returns = _strategy_returns(strategy, data, cost_bps)
     if observed_returns.size < 2 or not np.all(np.isfinite(observed_returns)):
         raise ValueError(
             "the strategy returned too few or non-finite values on the real "
@@ -378,7 +455,7 @@ def path_stress(
         scores: list[float] = []
         for index in range(paths.shape[0]):
             try:
-                result = np.asarray(strategy(paths[index]), dtype=float).reshape(-1)
+                result = _strategy_returns(strategy, paths[index], cost_bps)
             except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
                 errors.append(f"block {block} path {index}: {type(exc).__name__}: {exc}")
                 continue

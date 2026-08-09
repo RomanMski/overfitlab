@@ -442,3 +442,76 @@ def test_a_multiset_only_strategy_is_exactly_invariant():
             result.observed_annualised, abs=1e-12
         )
     assert result.structure_dependence() == pytest.approx(0.0, abs=1e-12)
+
+
+def trend_with_positions(market: np.ndarray):
+    """Reports its exposure as well as its returns, so costs can be charged."""
+
+    positions = np.sign(market[:-1])
+    return positions * market[1:], positions
+
+
+def hold_with_positions(market: np.ndarray):
+    return market, np.ones(market.size)
+
+
+def test_zero_cost_leaves_the_result_untouched():
+    market = ar1_market(1200, phi=0.3, seed=2)
+    free = path_stress(trend_with_positions, market, block_sizes=(1,), n_paths=40, seed=1)
+    charged = path_stress(
+        trend_with_positions, market, block_sizes=(1,), n_paths=40, seed=1, cost_bps=0.0
+    )
+    assert free.observed_sharpe == charged.observed_sharpe
+
+
+def test_costs_only_bite_where_there_is_turnover():
+    """Buy and hold trades once and then never again."""
+
+    rng = np.random.default_rng(5)
+    market = rng.normal(loc=0.0005, scale=0.01, size=1500)
+
+    free = path_stress(hold_with_positions, market, block_sizes=(1,), n_paths=30, seed=2)
+    charged = path_stress(
+        hold_with_positions, market, block_sizes=(1,), n_paths=30, seed=2, cost_bps=25.0
+    )
+    # One entry from flat, spread over 1500 periods, is close to nothing.
+    assert charged.observed_annualised == pytest.approx(free.observed_annualised, abs=0.02)
+
+
+def test_costs_erode_a_strategy_that_trades_constantly():
+    market = ar1_market(2000, phi=0.3, seed=7)
+
+    free = path_stress(trend_with_positions, market, block_sizes=(1,), n_paths=60, seed=3)
+    charged = path_stress(
+        trend_with_positions, market, block_sizes=(1,), n_paths=60, seed=3, cost_bps=10.0
+    )
+    assert charged.observed_annualised < free.observed_annualised
+    # And the shuffled markets get worse, because there the costs buy nothing.
+    assert charged.levels[0]["median_annualised"] < free.levels[0]["median_annualised"]
+
+
+def test_asking_for_costs_without_positions_is_an_error():
+    """Silently reporting a gross number as though it were net would be worse."""
+
+    market = ar1_market(400)
+    with pytest.raises(ValueError, match="only its returns"):
+        path_stress(momentum_strategy, market, block_sizes=(1,), n_paths=5, cost_bps=5.0)
+
+
+def test_apply_costs_validation():
+    from overfitlab import apply_costs
+
+    with pytest.raises(ValueError, match="same periods"):
+        apply_costs([0.01, 0.02, 0.03], [1.0, 1.0], 5.0)
+    with pytest.raises(ValueError, match="non-negative"):
+        apply_costs([0.01, 0.02], [1.0, 1.0], -1.0)
+
+
+def test_apply_costs_charges_each_change_in_position():
+    from overfitlab import apply_costs
+
+    returns = np.zeros(4)
+    positions = np.array([1.0, 1.0, -1.0, 0.0])
+    # Traded amounts: 1 to open, 0, 2 to flip, 1 to close.
+    net = apply_costs(returns, positions, 100.0)  # 100 bps = 1%
+    assert net == pytest.approx([-0.01, 0.0, -0.02, -0.01])
